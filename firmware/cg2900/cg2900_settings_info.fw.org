@@ -1,0 +1,18 @@
+########################################################################
+# ST-Ericsson Connectivity Chip Factory Settings Information File
+#
+# All information must be stored as follows
+#
+# HCI_revision	LMP_Subversion	File_name (without .org extension)
+#
+########################################################################
+########################################################################
+#
+# Factory Settings for ST-Ericsson - CG2900
+#
+#0x0200	0x0000	cg2900/CG2900_HREFP_SOC_2.0_4C2_LNAEN.fw
+#0x0200	0x0000	cg2900/CG2900_SGH_I997_SOC_2.0_4C2_LNAEN_v1.fw
+0x0200	0x0000	cg2900/CG2900_SGH_I997_SOC_2.0_4C2_LNAEN_v2.fw
+#
+########################################################################
+

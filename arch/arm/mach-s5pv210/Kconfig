@@ -1,0 +1,343 @@
+# arch/arm/mach-s5pv210/Kconfig
+#
+# Copyright (c) 2010 Samsung Electronics Co., Ltd.
+#		http://www.samsung.com/
+#
+# Licensed under GPLv2
+
+# Configuration options for the S5PV210/S5PC110
+
+if ARCH_S5PV210
+
+config CPU_S5PV210
+	bool
+	select PLAT_S5P
+	select S5PV210_PM if PM
+	help
+	  Enable S5PV210 CPU support
+
+choice
+	prompt "Select machine type"
+	depends on ARCH_S5PV210
+	default MACH_SMDKV210
+
+config MACH_SMDKV210
+	bool "SMDKV210"
+	select CPU_S5PV210
+	select ARCH_SPARSEMEM_ENABLE
+	select S3C_DEV_HSMMC
+	select S3C_DEV_HSMMC1 if !S5PV210_SD_CH0_8BIT
+	select S3C_DEV_HSMMC2
+	select S3C_DEV_HSMMC3 if !S5PV210_SD_CH2_8BIT
+	select S5PV210_SETUP_SDHCI
+	select PCI
+	help
+	  Machine support for Samsung SMDKV210
+
+config MACH_SMDKC110
+	bool "SMDKC110"
+	select CPU_S5PV210
+	select DISCONTIGMEM
+	select S3C_DEV_HSMMC
+	select S3C_DEV_HSMMC1 if !S5PV210_SD_CH0_8BIT
+	select S3C_DEV_HSMMC2
+	select S3C_DEV_HSMMC3 if !S5PV210_SD_CH2_8BIT
+	select S5PV210_SETUP_SDHCI
+	select ARCH_DISCONTIGMEM_ENABLE
+	select PCI
+	help
+	  Machine support for Samsung SMDKC110
+	  S5PC110(MCP) is one of package option of S5PV210
+
+config MACH_S5PC110_ARIES
+        bool "S5PC110_ARIES"
+        select CPU_S5PV210
+        select DISCONTIGMEM
+#        select S3C_DEV_HSMMC
+#        select S3C_DEV_HSMMC1 if !S5PV210_SD_CH0_8BIT
+#        select S3C_DEV_HSMMC2
+#        select S3C_DEV_HSMMC3
+        select S5PV210_SETUP_SDHCI
+        select ARCH_DISCONTIGMEM_ENABLE
+        select PCI
+        help
+          Machine support for Samsung S5PC110_ARIES 
+
+config MACH_S5PC110_P1
+        bool "S5PC110_P1"
+        select CPU_S5PV210
+        select DISCONTIGMEM
+        select S3C_DEV_HSMMC
+        select S3C_DEV_HSMMC1 if !S5PV210_SD_CH0_8BIT
+        select S3C_DEV_HSMMC2
+        select S5PV210_SETUP_SDHCI
+        select ARCH_DISCONTIGMEM_ENABLE
+        select PCI
+        help
+          Machine support for Samsung S5PC110_P1 
+
+endchoice
+
+choice
+	prompt "CPU revision"
+	depends on CPU_S5PV210
+	default CPU_S5PV210_EVT1
+
+config CPU_S5PV210_EVT0
+	bool "EVT0"
+	help
+	  Support EVT0
+
+config CPU_S5PV210_EVT1
+	bool "EVT1"
+	help
+	  Support EVT1
+endchoice
+
+choice
+        prompt "Select S1 locality"
+
+config ARIES_EUR
+        bool "select S1 Europe"
+        depends on MACH_S5PC110_ARIES
+        help
+	  Select S1 Europe
+
+config ARIES_NTT
+        bool "select S1 NTT"
+        depends on MACH_S5PC110_ARIES
+        help
+          Select S1 NTT
+endchoice
+
+
+choice
+	prompt "Select NA USA BOARD TYPE "
+
+config S5PC110_KEPLER_BOARD
+	bool "S5PC110_KEPLER"
+	select S3C_DEV_HSMMC
+        select S3C_DEV_HSMMC1 if !S5PV210_SD_CH0_8BIT
+        select S3C_DEV_HSMMC2
+	help
+		select NA USA Board 
+
+config S5PC110_T959_BOARD
+	bool "S5PC110_T959"
+	select S3C_DEV_HSMMC
+        select S3C_DEV_HSMMC1 if !S5PV210_SD_CH0_8BIT
+        select S3C_DEV_HSMMC2
+	help
+		select NA USA Board 
+
+
+config S5PC110_HAWK_BOARD
+	bool "S5PC110_HAWK"
+	select S3C_DEV_HSMMC1 if !S5PV210_SD_CH0_8BIT
+        select S3C_DEV_HSMMC2
+	help
+		select NA USA Board 
+		
+config S5PC110_VIBRANTPLUS_BOARD
+	bool "S5PC110_VIBRANTPLUS"
+        select S3C_DEV_HSMMC1 if !S5PV210_SD_CH0_8BIT
+        select S3C_DEV_HSMMC2
+	help
+		select NA USA Board		
+		
+config S5PC110_FLEMING_BOARD
+	bool "S5PC110_fleming"
+	select S3C_DEV_HSMMC
+	select S3C_DEV_HSMMC1 if !S5PV210_SD_CH0_8BIT
+        select S3C_DEV_HSMMC2
+	help
+		select NA USA Board 
+
+
+config S5PC110_DEMPSEY_BOARD
+	bool "S5PC110_DEMPSEY"
+        select S3C_DEV_HSMMC
+        select S3C_DEV_HSMMC1 if !S5PV210_SD_CH0_8BIT
+        select S3C_DEV_HSMMC2
+        select S3C_DEV_HSMMC3
+	help
+		select NA USA Board 
+
+		
+endchoice 
+
+choice 
+        prompt "Select KEPLER BOARD VERSION "
+config KEPLER_VER_B2
+        bool "add KEPLER VERSION B0"
+        depends on S5PC110_KEPLER_BOARD
+        help
+         add kepler ver B2 option 
+         
+endchoice
+
+choice 
+	prompt "Select T959 BOARD VERSION"
+	
+config T959_VER_B5
+        bool "add T959 VERSION"
+         depends on S5PC110_T959_BOARD
+        help
+         add T959 ver B5 option 
+         
+endchoice 
+
+choice 
+	prompt "Select HAWK BOARD VERSION"
+         
+config HAWK_VER_B0
+        bool "add HAWK VERSION"
+         depends on S5PC110_HAWK_BOARD
+        help
+         add HAWK ver B0 option 
+endchoice 
+
+config HAWK_VER_B0_HW_FIX
+        bool "add HAWK VERSION"
+         depends on S5PC110_HAWK_BOARD
+        help
+         add HAWK ver B0 option and HW FIX
+
+config HAWK_VER_B1_REAL_ADDED_FEATURE
+        bool "add HAWK VERSION"
+         depends on S5PC110_HAWK_BOARD
+        help
+         add HAWK ver Real B1 option 
+
+choice 
+	prompt "Select VIBRANTPLUS BOARD VERSION"
+         
+config VIBRANTPLUS_VER_B0
+        bool "add VIBRANTPLUS VERSION"
+         depends on S5PC110_VIBRANTPLUS_BOARD
+        help
+         add VIBRANTPLUS ver B0 option 
+endchoice 
+
+choice 
+	prompt "Select FLEMING BOARD VERSION"
+	
+config FLEMING_VER_B0
+        bool "add fleming VERSION"
+         depends on S5PC110_FLEMING_BOARD
+        help
+         add fleming ver B0 option 
+         
+endchoice 
+
+choice 
+	prompt "Select DEMPSEY BOARD VERSION"
+         
+config DEMPSEY_VER_B0
+        bool "add DEMPSEY VERSION"
+         depends on S5PC110_DEMPSEY_BOARD
+        help
+         add DEMPSEY ver B0 option 
+endchoice 
+
+config GPS_CHIPSET_STE_GNS7560
+        bool "add GPS GNS7560"
+        default n
+        help
+         add  GPS config
+
+config GPS_CHIPSET_STE_CG2900
+        bool "add GPS GNS2900"
+        default n
+        help
+         add  GPS config
+
+
+
+config DM9000_16BIT
+	bool "DM9000 16-bit"
+	depends on MACH_SMDKV210 || MACH_VOGUEV210
+	default n
+	help
+	  Support DM9000 ethernet controller with 16bit data bus
+
+config S5PV210_PM
+	bool
+	help
+	  Power Management code common to S5PV210
+
+config S5PV210_SETUP_SDHCI
+	bool
+	depends on PLAT_S5P
+	default y
+	help
+	  Internal helper functions for S5PCV210 based SDHCI systems
+
+comment "MMC/SD slot setup"
+depends on PLAT_S5P
+
+menu "Use 8-bit bus width"
+config S5PV210_SD_CH0_8BIT
+bool "Channel 0"
+depends on PLAT_S5P
+default n
+help
+IF channel 0 uses 8-bit bus, channel 1 is disabled.
+
+config S5PV210_SD_CH2_8BIT
+bool "Channel 2"
+depends on PLAT_S5P
+default n
+help
+IF channel 2 uses 8-bit bus, channel 3 is disabled.
+endmenu
+
+# platform specific device setup
+config S5PV210_SETUP_FB
+        bool
+        depends on FB_S3C
+        default y
+        help
+          Common setup code for FIMD controller.
+
+config S5PV210_ADCTS
+	bool "S5PV210 ADCTS Driver"
+	default n
+	help
+	  Common setup code for adc and touchscreen
+
+config S5P_ADC
+	bool	"S5PXXXX ADC driver"
+	depends on PLAT_S5P
+	default y
+	help
+	  ADC ( A/D Conversion ) driver for Samsung S5PXXXX
+
+config S5PV210_SETUP_FIMC0
+	bool
+	depends on VIDEO_FIMC
+	default y
+	help
+	  Common setup code for FIMC controller 0.
+
+config S5PV210_SETUP_FIMC1
+	bool
+	depends on VIDEO_FIMC
+	default y
+	help
+	  Common setup code for FIMC controller 1.
+
+config S5PV210_SETUP_FIMC2
+	bool
+	depends on VIDEO_FIMC
+	default y
+	help
+	  Common setup code for FIMC controller 2.
+
+config S5PV210_SETUP_CSIS
+	bool
+	depends on VIDEO_FIMC
+	default y
+	help
+	  Common setup code for MIPI-CSIS
+endif
