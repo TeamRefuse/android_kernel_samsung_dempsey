@@ -9,6 +9,9 @@ busybox rm init
 busybox mount -t proc proc /proc
 busybox mount -t sysfs sysfs /sys
 
+busybox insmod /lib/modules/fsr.ko
+busybox insmod /lib/modules/fsr_stl.ko
+
 dd bs=512 if=/dev/block/bml7 of=/stage1/boot.bin
 
 eval $(busybox grep -m 1 -A 1 BOOT_IMAGE_OFFSETS /stage1/boot.bin | busybox tail -n 1)
