@@ -4925,7 +4925,7 @@ void s3c_setup_keypad_cfg_gpio(int rows, int columns)
 EXPORT_SYMBOL(s3c_setup_keypad_cfg_gpio);
 #endif
 
-MACHINE_START(SMDKC110, "SGH-I997")
+MACHINE_START(SMDKC110, "dempsey")
 	/* Maintainer: Kukjin Kim <kgene.kim@samsung.com> */
 	.phys_io	= S3C_PA_UART & 0xfff00000,
 	.io_pg_offst	= (((u32)S3C_VA_UART) >> 18) & 0xfffc,
