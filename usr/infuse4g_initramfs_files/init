@@ -1,40 +1,46 @@
-#!/stage1/busybox sh
+#!/stage1/sh
 export _PATH="$PATH"
-export PATH=/stage1
+export PATH="/stage1"
 
-busybox cd /
-busybox date >>boot.txt
-exec >>boot.txt 2>&1
-busybox rm init
-busybox mount -t proc proc /proc
-busybox mount -t sysfs sysfs /sys
+insmod /lib/modules/fsr.ko
+insmod /lib/modules/fsr_stl.ko
 
-busybox insmod /lib/modules/fsr.ko
-busybox insmod /lib/modules/fsr_stl.ko
+date >>/boot.txt
+exec >>/boot.txt 2>&1
+cd /
+mount -t proc proc /proc
+mount -t sysfs sysfs /sys
+
+rm /init
 
 dd bs=512 if=/dev/block/bml7 of=/stage1/boot.bin
 
-eval $(busybox grep -m 1 -A 1 BOOT_IMAGE_OFFSETS /stage1/boot.bin | busybox tail -n 1)
+eval $(grep -m 1 -A 1 BOOT_IMAGE_OFFSETS /stage1/boot.bin | tail -n 1)
 
 load_offset=$boot_offset
 load_len=$boot_len
 
-busybox mount -t ext4 /dev/block/stl11 /cache
+mount -t ext4 /dev/block/stl11 /cache
 
-if busybox test -e /cache/.startrecovery || busybox grep -q bootmode=2 /proc/cmdline ; then
+if test -e /cache/.startrecovery || grep -q bootmode=2 /proc/cmdline ; then
 	# recovery boot
-	busybox rm -fr /cache/.startrecovery
+	rm -fr /cache/.startrecovery
 	load_offset=$recovery_offset
 	load_len=$recovery_len
 fi
 
-busybox umount /cache
+umount /cache
+rm -rf /cache
 
-busybox dd bs=512 if=/stage1/boot.bin skip=$load_offset count=$load_len | busybox zcat | busybox cpio -i
+dd bs=512 if=/stage1/boot.bin skip=$load_offset count=$load_len | zcat | cpio -i
 
-busybox umount /sys
-busybox umount /proc
-busybox date >>boot.txt
-busybox rm -fr /stage1 /dev/*
+umount /sys
+umount /proc
+date >> /boot.txt
+
+rm -rf /stage1 
+rm -rf /dev/*
+
 export PATH="${_PATH}"
+
 exec /init
