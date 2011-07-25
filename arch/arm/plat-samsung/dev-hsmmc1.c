@@ -54,7 +54,6 @@ struct platform_device s3c_device_hsmmc1 = {
 		.platform_data		= &s3c_hsmmc1_def_platdata,
 	},
 };
-EXPORT_SYMBOL(s3c_device_hsmmc1);
 
 void s3c_sdhci1_set_platdata(struct s3c_sdhci_platdata *pd)
 {
@@ -80,8 +79,6 @@ void s3c_sdhci1_set_platdata(struct s3c_sdhci_platdata *pd)
 		set->detect_ext_cd = pd->detect_ext_cd;
 	if (pd->detect_ext_cd)
 		set->detect_ext_cd = pd->detect_ext_cd;
-#ifdef CONFIG_S5PC110_DEMPSEY_BOARD
-	if (pd->translate_vdd)
-		set->translate_vdd = pd->translate_vdd;
-#endif /* CONFIG_MACH_S5PC110_ARIES */
+	if (pd->built_in)
+		set->built_in = pd->built_in;
 }

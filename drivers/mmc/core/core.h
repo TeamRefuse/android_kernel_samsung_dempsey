@@ -28,10 +28,7 @@ struct mmc_bus_ops {
 
 void mmc_attach_bus(struct mmc_host *host, const struct mmc_bus_ops *ops);
 void mmc_detach_bus(struct mmc_host *host);
-//[NAGSM_Android_HDLNC_SDcard_SEOJW_2011_01_12 : eMMC Trim add 
-#if defined (CONFIG_MMC_DISCARD) && defined (CONFIG_S5PC110_DEMPSEY_BOARD)
-void mmc_init_erase(struct mmc_card *card);
-#endif /* CONFIG_MMC_DISCARD */
+
 void mmc_set_chip_select(struct mmc_host *host, int mode);
 void mmc_set_clock(struct mmc_host *host, unsigned int hz);
 void mmc_set_bus_mode(struct mmc_host *host, unsigned int mode);
@@ -57,7 +54,9 @@ int mmc_attach_mmc(struct mmc_host *host, u32 ocr);
 int mmc_attach_sd(struct mmc_host *host, u32 ocr);
 int mmc_attach_sdio(struct mmc_host *host, u32 ocr);
 
+/* Module parameters */
 extern int use_spi_crc;
+extern int mmc_assume_removable;
 
 /* Debugfs information for hosts and cards */
 void mmc_add_host_debugfs(struct mmc_host *host);

@@ -91,10 +91,7 @@ struct mmc_command {
  * ENOMEDIUM    Host can determine that the slot is empty and is
  *              actively failing requests
  */
- //[NAGSM_Android_HDLNC_SDcard_SEOJW_2011_01_12 : eMMC Trim add 
-#if defined (CONFIG_MMC_DISCARD) && defined (CONFIG_S5PC110_DEMPSEY_BOARD)
-	unsigned int		erase_timeout;	/* in milliseconds */
-#endif /* CONFIG_MMC_DISCARD */
+
 	struct mmc_data		*data;		/* data segment associated with cmd */
 	struct mmc_request	*mrq;		/* associated request */
 };
@@ -136,22 +133,7 @@ extern void mmc_wait_for_req(struct mmc_host *, struct mmc_request *);
 extern int mmc_wait_for_cmd(struct mmc_host *, struct mmc_command *, int);
 extern int mmc_wait_for_app_cmd(struct mmc_host *, struct mmc_card *,
 	struct mmc_command *, int);
-//[NAGSM_Android_HDLNC_SDcard_SEOJW_2011_01_12 : eMMC Trim add 
-#if defined (CONFIG_MMC_DISCARD) && defined (CONFIG_S5PC110_DEMPSEY_BOARD)
-#define MMC_ERASE_ARG       0x00000000
-#define MMC_SECURE_ERASE_ARG    0x80000000
-#define MMC_TRIM_ARG        0x00000001
-#define MMC_SECURE_TRIM1_ARG    0x80000001
-#define MMC_SECURE_TRIM2_ARG    0x80008000
-#define MMC_SECURE_ARGS     0x80000000
-#define MMC_TRIM_ARGS       0x00008001
-extern int mmc_erase(struct mmc_card *card, unsigned int from, unsigned int nr,
-             unsigned int arg);
-extern int mmc_can_erase(struct mmc_card *card);
-extern int mmc_can_trim(struct mmc_card *card);
-extern int mmc_erase_group_aligned(struct mmc_card *card, unsigned int from,
-                   unsigned int nr);
-#endif /* CONFIG_MMC_DISCARD */
+
 extern void mmc_set_data_timeout(struct mmc_data *, const struct mmc_card *);
 extern unsigned int mmc_align_data_size(struct mmc_card *, unsigned int);
 

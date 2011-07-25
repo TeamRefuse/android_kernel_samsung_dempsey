@@ -68,6 +68,12 @@ extern int sdioh_mmc_irq(int irq);
 #include <mach/gpio.h>
 #endif
 
+#ifdef CUSTOMER_HW_SAMSUNG
+int wifi_set_carddetect(int on);
+int wifi_set_power(int on, unsigned long msec);
+int wifi_get_irq_number(unsigned long *irq_flags_ptr);
+#endif
+
 /* Customer specific Host GPIO defintion  */
 #ifdef CONFIG_MACH_SAMSUNG_P3
 static int dhd_oob_gpio_num = TEGRA_GPIO_PS0;
@@ -75,7 +81,7 @@ static int dhd_oob_gpio_num = TEGRA_GPIO_PS0;
 #ifdef CONFIG_MACH_C1
 static int dhd_oob_gpio_num = IRQ_EINT(21);
 #endif
-#ifdef CONFIG_MACH_S5PC110_ARIES
+#ifdef CONFIG_S5PC110_DEMPSEY_BOARD
 static int dhd_oob_gpio_num = IRQ_EINT(20);
 #endif
 
@@ -96,34 +102,18 @@ MODULE_PARM_DESC(dhd_oob_gpio_num, "DHD oob gpio number");
 int dhd_customer_oob_irq_map(unsigned long *irq_flags_ptr)
 {
 	int  host_oob_irq = 0;
+	printf("%s:%d\n",__FUNCTION__,__LINE__);
+	host_oob_irq = wifi_get_irq_number(irq_flags_ptr);
 
-#if defined(CUSTOM_OOB_GPIO_NUM)
-	if (dhd_oob_gpio_num < 0) {
-		dhd_oob_gpio_num = CUSTOM_OOB_GPIO_NUM;
-	}
-#endif
-
-	if (dhd_oob_gpio_num < 0) {
-		WL_ERROR(("%s: ERROR customer specific Host GPIO is NOT defined \n",
-			__FUNCTION__));
-		return (dhd_oob_gpio_num);
-	}
-
-	WL_ERROR(("%s: customer specific Host GPIO number is (%d), flag=0x%X\n",
-	         __FUNCTION__, dhd_oob_gpio_num, (unsigned int)*irq_flags_ptr));
-
-#ifdef CONFIG_MACH_SAMSUNG_P3
-	host_oob_irq = gpio_to_irq(dhd_oob_gpio_num);
-#elif defined(SYSLSI_SPECIFIC)
-	host_oob_irq = dhd_oob_gpio_num;
-#endif
+	WL_ERROR(("%s: customer specific Host GPIO number is (%d)\n",
+	         __FUNCTION__, host_oob_irq));
 
 	return (host_oob_irq);
 }
 #endif /* defined(OOB_INTR_ONLY) */
 
 /* Customer function to control hw specific wlan gpios */
-void
+/*void
 dhd_customer_gpio_wlan_ctrl(int onoff)
 {
 	switch (onoff) {
@@ -173,6 +163,39 @@ dhd_customer_gpio_wlan_ctrl(int onoff)
 #endif
 			/* Lets customer power to get stable */
 			/* OSL_DELAY(200); */
+/*		break;
+	}*/
+void
+dhd_customer_gpio_wlan_ctrl(int onoff)
+{
+	printf("%s:%d\n",__FUNCTION__,__LINE__);
+	switch (onoff) {
+		case WLAN_RESET_OFF:
+			WL_TRACE(("%s: call customer specific GPIO to insert WLAN RESET\n",
+				__FUNCTION__));
+
+			//wifi_set_power(0, 0);
+
+			WL_ERROR(("=========== WLAN placed in RESET ========\n"));
+		break;
+
+		case WLAN_RESET_ON:
+			WL_TRACE(("%s: callc customer specific GPIO to remove WLAN RESET\n",
+				__FUNCTION__));
+
+			//wifi_set_power(1, 0);
+
+			WL_ERROR(("=========== WLAN going back to live  ========\n"));
+		break;
+
+		case WLAN_POWER_OFF:
+			WL_TRACE(("%s: call customer specific GPIO to turn off WL_REG_ON\n",
+				__FUNCTION__));
+		break;
+
+		case WLAN_POWER_ON:
+			WL_TRACE(("%s: call customer specific GPIO to turn on WL_REG_ON\n",
+				__FUNCTION__));
 		break;
 	}
 }

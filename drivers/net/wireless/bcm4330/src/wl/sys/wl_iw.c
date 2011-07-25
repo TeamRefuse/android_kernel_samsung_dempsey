@@ -6251,6 +6251,8 @@ wl_iw_set_cscan(
 			g_first_broadcast_scan = BROADCAST_SCAN_FIRST_RESULT_CONSUMED;
 		}
 
+		net_os_wake_lock_timeout_enable(dev);
+
 		/* Combined SCAN execution */
 		res = wl_iw_combined_scan_set(dev, ssids_local, nssid, nchan);
 

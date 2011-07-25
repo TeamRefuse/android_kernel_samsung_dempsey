@@ -2,8 +2,8 @@
  *
  * HDMI ftn. file for Samsung TVOut driver
  *
- * Copyright (c) 2009 Samsung Electronics
- * 	http://www.samsungsemi.com/
+ * Copyright (c) 2010 Samsung Electronics
+ * http://www.samsungsemi.com/
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -14,10 +14,8 @@
 #include <linux/kernel.h>
 #include <linux/stddef.h>
 #include <linux/ioctl.h>
-
 #include <linux/delay.h>
-
-#include <asm/io.h>
+#include <linux/io.h>
 
 #include "s5p_tv.h"
 
@@ -30,7 +28,7 @@
 
 #ifdef S5P_STDA_HDMI_DEBUG
 #define STHDPRINTK(fmt, args...) \
-	printk("\t[STDA_HDMI] %s: " fmt, __FUNCTION__ , ## args)
+	printk(KERN_INFO "\t[STDA_HDMI] %s: " fmt, __func__ , ## args)
 #else
 #define STHDPRINTK(fmt, args...)
 #endif
@@ -38,23 +36,27 @@
 /*
 static bool _s5p_hdmi_spd_infoframe(unsigned long p_buf_in)
 {
-	STHDPRINTK("(0x%x)\n\r",(unsigned int)p_buf_in);
+	STHDPRINTK("(0x%x)\n\r", (unsigned int)p_buf_in);
 
-	if(!p_buf_in)
+	if (!p_buf_in)
 	{
 		STHDPRINTK("(ERR) p_buf_in is NULL\n\r");
 		return false;
 	}
 
-	memcpy((void *)(&(s5ptv_status.hdmi_spd_info_frame)), (const void *)p_buf_in, sizeof(s5p_hdmi_spd_infoframe));
+	memcpy((void *)(&(s5ptv_status.hdmi_spd_info_frame)),
+		(const void *)p_buf_in, sizeof(s5p_hdmi_spd_infoframe));
 
-	memcpy((void *)(s5ptv_status.spd_header), (const void *)(s5ptv_status.hdmi_spd_info_frame.spd_header), 3);
+	memcpy((void *)(s5ptv_status.spd_header),
+	(const void *)(s5ptv_status.hdmi_spd_info_frame.spd_header), 3);
 	s5ptv_status.hdmi_spd_info_frame.spd_header = s5ptv_status.spd_header;
 
-	memcpy((void *)(s5ptv_status.spd_data),	 (const void *)(s5ptv_status.hdmi_spd_info_frame.spd_data), 28);
+	memcpy((void *)(s5ptv_status.spd_data),
+		(const void *)(s5ptv_status.hdmi_spd_info_frame.spd_data), 28);
 	s5ptv_status.hdmi_spd_info_frame.spd_data = s5ptv_status.spd_data;
 
-	STHDPRINTK("(0x%08x)\n\r",(unsigned int)&s5ptv_status.hdmi_spd_info_frame);
+	STHDPRINTK("(0x%08x)\n\r",
+		(unsigned int)&s5ptv_status.hdmi_spd_info_frame);
 
 	return true;
 }
@@ -81,16 +83,12 @@ static bool _s5p_hdmi_init_audio(unsigned long p_buf_in)
 {
 	STHDPRINTK("(%d)\n\r", (bool)p_buf_in);
 
-	// SPMOON
-//	_s5p_spdif_test();
-	// SPMOON //
-
 	if (!p_buf_in) {
 		STHDPRINTK("(ERR) p_buf_in is NULL\n\r");
 		return false;
 	}
 
-	s5ptv_status.hdmi_audio_type = (s5p_hdmi_audio_type)p_buf_in;
+	s5ptv_status.hdmi_audio_type = (enum s5p_hdmi_audio_type)p_buf_in;
 
 	STHDPRINTK("(%d)\n\r", s5ptv_status.hdmi_audio_type);
 
@@ -108,7 +106,7 @@ static bool _s5p_hdmi_get_hpd_status(unsigned long p_buf_out)
 		return false;
 	}
 
-	pOut = (bool*)p_buf_out;
+	pOut = (bool *)p_buf_out;
 
 	*pOut = s5ptv_status.hpd_status;
 
@@ -120,11 +118,6 @@ static bool _s5p_hdmi_get_hpd_status(unsigned long p_buf_out)
 static bool _s5p_hdmi_wait_hpd_status_change(unsigned long p_buf_out)
 {
 	unsigned int *pOut;
-//	unsigned int temp_reg_v;
-//	unsigned int uCurPcmSize;
-//	unsigned short sample;
-//	int i = 0;
-//	unsigned char temp[256];
 
 	STHDPRINTK("()\n\r");
 
@@ -135,20 +128,17 @@ static bool _s5p_hdmi_wait_hpd_status_change(unsigned long p_buf_out)
 
 	pOut = (unsigned int *)p_buf_out;
 
-//	*pOut = _s5p_interrupt_wait_hpd_cmd_done();
 
-// TO-DO ::
 	/*
-		if(*pOut == WAIT_TIMEOUT)
+		if (*pOut == WAIT_TIMEOUT)
 		{
 			STHDPRINTK("(ERR) TIMEOUT~\n\r");
 		}
-		else if(*pOut == WAIT_FAILED)
+		else if (*pOut == WAIT_FAILED)
 		{
 			STHDPRINTK("(ERR) WAIT_FAILED\n\r");
 		}
 	*/
-//	STHDPRINTK("() change hpd status\n\r");
 
 	return true;
 }
@@ -161,17 +151,19 @@ static bool _s5p_hdmi_wait_hpd_status_change(unsigned long p_buf_out)
 static bool _s5p_hdmi_video_init_bluescreen(unsigned long p_buf_in)
 {
 
-	STHDPRINTK("(0x%x)\n\r",(unsigned int)p_buf_in);
+	STHDPRINTK("(0x%x)\n\r", (unsigned int)p_buf_in);
 
-	if(!p_buf_in)
+	if (!p_buf_in)
 	{
 		STHDPRINTK("(ERR) p_buf_in is NULL\n\r");
 		return false;
 	}
 
-	memcpy((void *)(&(s5ptv_status.hdmi_video_blue_screen)), (const void *)p_buf_in,sizeof(s5p_hdmi_bluescreen));
+	memcpy((void *)(&(s5ptv_status.hdmi_video_blue_screen)),
+		(const void *)p_buf_in, sizeof(s5p_hdmi_bluescreen));
 
-	STHDPRINTK("(0x%08x)\n\r",(unsigned int)&s5ptv_status.hdmi_video_blue_screen);
+	STHDPRINTK("(0x%08x)\n\r",
+		(unsigned int)&s5ptv_status.hdmi_video_blue_screen);
 
 	return true;
 }
@@ -180,60 +172,68 @@ static bool _s5p_hdmi_video_init_avi_infoframe(unsigned long p_buf_in)
 {
 	STHDPRINTK("(0x%x)\n\r", (unsigned int)p_buf_in);
 
-	if(!p_buf_in)
+	if (!p_buf_in)
 	{
 		STHDPRINTK("(ERR) p_buf_in is NULL\n\r");
 		return false;
 	}
 
-	memcpy((void *)(&(s5ptv_status.hdmi_av_info_frame)), (const void *)p_buf_in, sizeof(s5p_hdmi_video_infoframe));
+	memcpy((void *)(&(s5ptv_status.hdmi_av_info_frame)),
+		(const void *)p_buf_in, sizeof(s5p_hdmi_video_infoframe));
 
-	memcpy((void *)(s5ptv_status.avi_byte),(const void *)(s5ptv_status.hdmi_av_info_frame.data), 13);
+	memcpy((void *)(s5ptv_status.avi_byte),
+		(const void *)(s5ptv_status.hdmi_av_info_frame.data), 13);
 	s5ptv_status.hdmi_av_info_frame.data = s5ptv_status.avi_byte;
 
-	STHDPRINTK("(0x%08x)\n\r",(unsigned int)&s5ptv_status.hdmi_av_info_frame);
+	STHDPRINTK("(0x%08x)\n\r",
+		(unsigned int)&s5ptv_status.hdmi_av_info_frame);
 
 	return true;
 }
 
 static bool _s5p_hdmi_video_init_mpg_infoframe(unsigned long p_buf_in)
 {
-	STHDPRINTK("(0x%x)\n\r",(unsigned int)p_buf_in);
+	STHDPRINTK("(0x%x)\n\r", (unsigned int)p_buf_in);
 
-	if(!p_buf_in)
+	if (!p_buf_in)
 	{
 		STHDPRINTK("(ERR) p_buf_in is NULL\n\r");
 		return false;
 	}
 
-	memcpy((void *)(&(s5ptv_status.hdmi_mpg_info_frame)), (const void *)p_buf_in, sizeof(s5p_hdmi_video_infoframe));
+	memcpy((void *)(&(s5ptv_status.hdmi_mpg_info_frame)),
+		(const void *)p_buf_in, sizeof(s5p_hdmi_video_infoframe));
 
-	memcpy((void *)(s5ptv_status.mpg_byte), (const void *)(s5ptv_status.hdmi_mpg_info_frame.data), 5);
+	memcpy((void *)(s5ptv_status.mpg_byte),
+		(const void *)(s5ptv_status.hdmi_mpg_info_frame.data), 5);
 	s5ptv_status.hdmi_mpg_info_frame.data = s5ptv_status.avi_byte;
 
-	STHDPRINTK("(0x%08x)\n\r",(unsigned int)&s5ptv_status.hdmi_mpg_info_frame);
+	STHDPRINTK("(0x%08x)\n\r",
+		(unsigned int)&s5ptv_status.hdmi_mpg_info_frame);
 
 	return true;
 }
 
 static bool _s5p_hdmi_video_set_bluescreen(unsigned long p_buf_in)
 {
-	STHDPRINTK("(0x%x)\n\r",(unsigned int)p_buf_in);
+	STHDPRINTK("(0x%x)\n\r", (unsigned int)p_buf_in);
 
-	if(!p_buf_in)
+	if (!p_buf_in)
 	{
 		STHDPRINTK("(ERR) p_buf_in is NULL\n\r");
 		return false;
 	}
 
-	memcpy((void *)(&(s5ptv_status.hdmi_video_blue_screen)), (const void *)p_buf_in, sizeof(s5p_hdmi_bluescreen));
+	memcpy((void *)(&(s5ptv_status.hdmi_video_blue_screen)),
+		(const void *)p_buf_in, sizeof(s5p_hdmi_bluescreen));
 
 	__s5p_hdmi_video_set_bluescreen(s5ptv_status.hdmi_video_blue_screen.en,
-							s5ptv_status.hdmi_video_blue_screen.cb_b,
-							s5ptv_status.hdmi_video_blue_screen.y_g,
-							s5ptv_status.hdmi_video_blue_screen.cr_r);
+		s5ptv_status.hdmi_video_blue_screen.cb_b,
+		s5ptv_status.hdmi_video_blue_screen.y_g,
+		s5ptv_status.hdmi_video_blue_screen.cr_r);
 
-	STHDPRINTK("(0x%08x)\n\r",(unsigned int)&s5ptv_status.hdmi_video_blue_screen);
+	STHDPRINTK("(0x%08x)\n\r",
+		(unsigned int)&s5ptv_status.hdmi_video_blue_screen);
 
 	return true;
 }

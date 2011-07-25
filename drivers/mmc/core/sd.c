@@ -11,6 +11,7 @@
  */
 
 #include <linux/err.h>
+#include <linux/slab.h>
 
 #include <linux/mmc/host.h>
 #include <linux/mmc/card.h>
@@ -712,7 +713,7 @@ static void mmc_sd_attach_bus_ops(struct mmc_host *host)
 {
 	const struct mmc_bus_ops *bus_ops;
 
-	if (host->caps & MMC_CAP_NONREMOVABLE)
+	if (host->caps & MMC_CAP_NONREMOVABLE || !mmc_assume_removable)
 		bus_ops = &mmc_sd_ops_unsafe;
 	else
 		bus_ops = &mmc_sd_ops;

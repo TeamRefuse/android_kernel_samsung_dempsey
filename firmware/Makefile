@@ -26,17 +26,18 @@ fw-shipped- += acenic/tg1.bin
 else
 acenic-objs := acenic/tg1.bin acenic/tg2.bin
 endif
+fw-shipped-$(CONFIG_VIDEO_MFC50) += samsung_mfc_fw.bin
 fw-shipped-$(CONFIG_3C359) += 3com/3C359.bin
 fw-shipped-$(CONFIG_ACENIC) += $(acenic-objs)
 fw-shipped-$(CONFIG_ADAPTEC_STARFIRE) += adaptec/starfire_rx.bin \
 					 adaptec/starfire_tx.bin
 fw-shipped-$(CONFIG_ATARI_DSP56K) += dsp56k/bootstrap.bin
 fw-shipped-$(CONFIG_ATM_AMBASSADOR) += atmsar11.fw
-fw-shipped-$(CONFIG_BNX2X) += bnx2x-e1-5.0.21.0.fw bnx2x-e1h-5.0.21.0.fw
-fw-shipped-$(CONFIG_BNX2) += bnx2/bnx2-mips-09-5.0.0.j3.fw \
-			     bnx2/bnx2-rv2p-09-5.0.0.j3.fw \
-			     bnx2/bnx2-rv2p-09ax-5.0.0.j3.fw \
-			     bnx2/bnx2-mips-06-5.0.0.j3.fw \
+fw-shipped-$(CONFIG_BNX2X) += bnx2x-e1-5.2.13.0.fw bnx2x-e1h-5.2.13.0.fw
+fw-shipped-$(CONFIG_BNX2) += bnx2/bnx2-mips-09-5.0.0.j15.fw \
+			     bnx2/bnx2-rv2p-09-5.0.0.j10.fw \
+			     bnx2/bnx2-rv2p-09ax-5.0.0.j10.fw \
+			     bnx2/bnx2-mips-06-5.0.0.j6.fw \
 			     bnx2/bnx2-rv2p-06-5.0.0.j3.fw
 fw-shipped-$(CONFIG_CASSINI) += sun/cassini.bin
 fw-shipped-$(CONFIG_COMPUTONE) += intelliport2.bin
@@ -69,7 +70,8 @@ fw-shipped-$(CONFIG_E100) += e100/d101m_ucode.bin e100/d101s_ucode.bin \
 fw-shipped-$(CONFIG_MYRI_SBUS) += myricom/lanai.bin
 fw-shipped-$(CONFIG_PCMCIA_PCNET) += cis/LA-PCM.cis cis/PCMLM28.cis \
 				     cis/DP83903.cis cis/NE2K.cis \
-				     cis/tamarack.cis cis/PE-200.cis
+				     cis/tamarack.cis cis/PE-200.cis \
+				     cis/PE520.cis
 fw-shipped-$(CONFIG_PCMCIA_3C589) += cis/3CXEM556.cis
 fw-shipped-$(CONFIG_PCMCIA_3C574) += cis/3CCFEM556.cis
 fw-shipped-$(CONFIG_SERIAL_8250_CS) += cis/MT5634ZLX.cis cis/RS-COM-2P.cis \
@@ -82,6 +84,7 @@ fw-shipped-$(CONFIG_SCSI_ADVANSYS) += advansys/mcode.bin advansys/38C1600.bin \
 fw-shipped-$(CONFIG_SCSI_QLOGIC_1280) += qlogic/1040.bin qlogic/1280.bin \
 					 qlogic/12160.bin
 fw-shipped-$(CONFIG_SCSI_QLOGICPTI) += qlogic/isp1000.bin
+fw-shipped-$(CONFIG_INFINIBAND_QIB) += qlogic/sd7220.fw
 fw-shipped-$(CONFIG_SMCTR) += tr_smctr.bin
 fw-shipped-$(CONFIG_SND_KORG1212) += korg/k1212.dsp
 fw-shipped-$(CONFIG_SND_MAESTRO3) += ess/maestro3_assp_kernel.fw \
@@ -136,16 +139,13 @@ fw-shipped-$(CONFIG_USB_SERIAL_XIRCOM) += keyspan_pda/xircom_pgs.fw
 fw-shipped-$(CONFIG_USB_VICAM) += vicam/firmware.fw
 fw-shipped-$(CONFIG_VIDEO_CPIA2) += cpia2/stv0672_vp4.bin
 fw-shipped-$(CONFIG_YAM) += yam/1200.bin yam/9600.bin
-#fw-shipped-$(CONFIG_VIDEO_M5MO) += m5mo/RS_M5LS.bin
 fw-shipped-$(CONFIG_MFD_CG2900) += cg2900/cg2900_patch_info.fw cg2900/cg2900_settings_info.fw \
-                                   cg2900/CG2900_HREFP_SOC_2.0_4C2_LNAEN.fw cg2900/CG2900_BTARMSS_2.0P4C2.fw \
-				   cg2900/CG2900_BTARMSS_2.xP5C3.fw \
-				   cg2900/CG2900_SGH_I997_SOC_2.0_4C2_LNAEN_v1.fw cg2900/CG2900_SGH_I997_SOC_2.0_4C2_LNAEN_v2.fw
+                                   cg2900/CG2900_BTARMSS_2.xP5C3.fw cg2900/CG2900_Dempsey_SOC_2.x_G_1C1.fw
 
 fw-shipped-all := $(fw-shipped-y) $(fw-shipped-m) $(fw-shipped-)
 
 # Directories which we _might_ need to create, so we have a rule for them.
-firmware-dirs := $(sort $(patsubst %,$(objtree)/$(obj)/%/,$(dir $(fw-external-y) $(fw-shipped-all))))
+firmware-dirs := $(sort $(addprefix $(objtree)/$(obj)/,$(dir $(fw-external-y) $(fw-shipped-all))))
 
 quiet_cmd_mkdir = MKDIR   $(patsubst $(objtree)/%,%,$@)
       cmd_mkdir = mkdir -p $@
@@ -153,8 +153,10 @@ quiet_cmd_mkdir = MKDIR   $(patsubst $(objtree)/%,%,$@)
 quiet_cmd_ihex  = IHEX    $@
       cmd_ihex  = $(OBJCOPY) -Iihex -Obinary $< $@
 
+#+ GingerBread
 quiet_cmd_copy  = COPY    $@
 	cmd_copy  = cp $< $@
+#- GingerBread
 
 quiet_cmd_ihex2fw  = IHEX2FW $@
       cmd_ihex2fw  = $(objtree)/$(obj)/ihex2fw $< $@
@@ -219,8 +221,10 @@ $(patsubst %,$(obj)/%.gen.o, $(fw-external-y)): $(obj)/%.gen.o: $(fwdir)/%
 $(obj)/%: $(obj)/%.ihex | $(objtree)/$(obj)/$$(dir %)
 	$(call cmd,ihex)
 
+#+ GingerBread
 $(obj)/%: $(obj)/%.org | $(objtree)/$(obj)/$$(dir %)
 	$(call cmd,copy)
+#- GingerBread
 
 # Don't depend on ihex2fw if we're installing and it already exists.
 # Putting it after | in the dependencies doesn't seem sufficient when

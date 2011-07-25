@@ -42,7 +42,6 @@
 #define FILENAME_MAX				128
 
 #define WQ_NAME					"cg2900_chip_wq"
-
 /* ++Hemant: Update the location of firmware files */
 #define PATCH_INFO_FILE				"cg2900/cg2900_patch_info.fw"
 #define FACTORY_SETTINGS_INFO_FILE		"cg2900/cg2900_settings_info.fw"
@@ -154,7 +153,9 @@ enum boot_state {
 	BOOT_GET_FILES_TO_LOAD,
 	BOOT_DOWNLOAD_PATCH,
 	BOOT_ACTIVATE_PATCHES_AND_SETTINGS,
-	BOOT_DISABLING_BT_IP,
+	/* ++ Hemant: Don't disable the BT IP */
+	/* BOOT_DISABLING_BT_IP, */
+	/* -- Hemant: Don't disable the BT IP */
 	BOOT_READY,
 	BOOT_FAILED
 };
@@ -1604,6 +1605,8 @@ static bool handle_vs_system_reset_cmd_complete(u8 *data)
 		return false;
 
 	if (HCI_BT_ERROR_NO_ERROR == status) {
+/* ++ Hemant: Don't disable the BT IP */
+#if 0		
 		schedule_timeout_interruptible(msecs_to_jiffies(DELAY_BEFORE_SENDING_DISABLE_BT_IP_WAIT));
 		/* Send HCI BluetoothEnable IP command */
 		SET_BOOT_STATE(BOOT_DISABLING_BT_IP);
@@ -1611,9 +1614,15 @@ static bool handle_vs_system_reset_cmd_complete(u8 *data)
 
 		create_and_send_bt_cmd(hci_vs_enable_bluetooth_cmd_req,
 				       sizeof(hci_vs_enable_bluetooth_cmd_req));
-
-
-		
+#else
+		/*
+		 * The boot sequence is now finished successfully.
+		 * Set states and signal to waiting thread.
+		 */
+		SET_BOOT_STATE(BOOT_READY);
+		cg2900_chip_startup_finished(0);
+#endif
+/* -- Hemant: Don't disable the BT IP */
 	} else {
 		CG2900_ERR("Received Reset complete event with status 0x%X", status);
 		SET_BOOT_STATE(BOOT_FAILED);
@@ -1633,7 +1642,7 @@ static bool handle_vs_system_reset_cmd_complete(u8 *data)
  */
 static bool handle_vs_bluetooth_enable_cmd_status(u8 status)
 {
-	if (cg2900_info->boot_state != BOOT_DISABLING_BT_IP)
+//	if (cg2900_info->boot_state != BOOT_DISABLING_BT_IP)
 		return false;
 
 	/*
@@ -1661,7 +1670,7 @@ static bool handle_vs_bluetooth_enable_cmd_complete(u8 *data)
 {
 	u8 status = data[0];
 
-	if (cg2900_info->boot_state != BOOT_DISABLING_BT_IP)
+//	if (cg2900_info->boot_state != BOOT_DISABLING_BT_IP)
 		return false;
 
 	if (HCI_BT_ERROR_NO_ERROR == status) {

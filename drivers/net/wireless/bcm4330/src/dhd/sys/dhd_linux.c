@@ -25,6 +25,9 @@
  * $Id: dhd_linux.c,v 1.131.2.49.2.4 2011/02/10 17:56:58 Exp $
  */
 
+#ifdef CONFIG_WIFI_CONTROL_FUNC
+#include <linux/platform_device.h>
+#endif
 #include <typedefs.h>
 #include <linuxver.h>
 #include <osl.h>
@@ -94,6 +97,133 @@ static histo_t vi_d1, vi_d2, vi_d3, vi_d4;
 #include <bcmsdh.h>
 #endif
 
+#if defined(CUSTOMER_HW_SAMSUNG) && defined(CONFIG_WIFI_CONTROL_FUNC)
+#include <linux/wifi_tiwlan.h>
+
+struct semaphore wifi_control_sem;
+
+struct dhd_bus *g_bus;
+
+static struct wifi_platform_data *wifi_control_data = NULL;
+static struct resource *wifi_irqres = NULL;
+
+int wifi_get_irq_number(unsigned long *irq_flags_ptr)
+{
+	if (wifi_irqres) {
+		*irq_flags_ptr = wifi_irqres->flags & IRQF_TRIGGER_MASK;
+		return (int)wifi_irqres->start;
+	}
+#ifdef CUSTOM_OOB_GPIO_NUM
+	return CUSTOM_OOB_GPIO_NUM;
+#else
+	return -1;
+#endif
+}
+
+int wifi_set_carddetect(int on)
+{
+	printk("%s = %d\n", __FUNCTION__, on);
+	if (wifi_control_data && wifi_control_data->set_carddetect) {
+		wifi_control_data->set_carddetect(on);
+	}
+	return 0;
+}
+
+int wifi_set_power(int on, unsigned long msec)
+{
+	printk("%s = %d\n", __FUNCTION__, on);
+	if (wifi_control_data && wifi_control_data->set_power) {
+		wifi_control_data->set_power(on);
+	}
+	if (msec)
+		mdelay(msec);
+	return 0;
+}
+
+int wifi_set_reset(int on, unsigned long msec)
+{
+	printk("%s = %d\n", __FUNCTION__, on);
+	if (wifi_control_data && wifi_control_data->set_reset) {
+		wifi_control_data->set_reset(on);
+	}
+	if (msec)
+		mdelay(msec);
+	return 0;
+}
+static int wifi_probe(struct platform_device *pdev)
+{
+	struct wifi_platform_data *wifi_ctrl =
+		(struct wifi_platform_data *)(pdev->dev.platform_data);
+
+	printk("## %s\n", __FUNCTION__);
+	wifi_irqres = platform_get_resource_byname(pdev, IORESOURCE_IRQ, "bcm4330_wlan_irq");
+	wifi_control_data = wifi_ctrl;
+
+	wifi_set_power(1, 0);	/* Power On */
+	wifi_set_carddetect(1);	/* CardDetect (0->1) */
+
+	up(&wifi_control_sem);
+	return 0;
+}
+
+static int wifi_remove(struct platform_device *pdev)
+{
+	struct wifi_platform_data *wifi_ctrl =
+		(struct wifi_platform_data *)(pdev->dev.platform_data);
+
+	printk("## %s\n", __FUNCTION__);
+	wifi_control_data = wifi_ctrl;
+
+	wifi_set_carddetect(0);	/* CardDetect (1->0) */
+	wifi_set_power(0, 0);	/* Power Off */
+
+	up(&wifi_control_sem);
+	return 0;
+}
+static int wifi_suspend(struct platform_device *pdev, pm_message_t state)
+{
+	DHD_TRACE(("##> %s\n", __FUNCTION__));
+	return 0;
+}
+static int wifi_resume(struct platform_device *pdev)
+{
+	DHD_TRACE(("##> %s\n", __FUNCTION__));
+	 return 0;
+}
+
+static struct platform_driver wifi_device = {
+	.probe          = wifi_probe,
+	.remove         = wifi_remove,
+	.suspend        = wifi_suspend,
+	.resume         = wifi_resume,
+	.driver         = {
+	.name   = "bcm4330_wlan",
+	}
+};
+
+int wifi_add_dev(void)
+{
+	DHD_TRACE(("## Calling platform_driver_register\n"));
+	return platform_driver_register(&wifi_device);
+}
+
+void wifi_del_dev(void)
+{
+	DHD_TRACE(("## Unregister platform_driver_register\n"));
+	platform_driver_unregister(&wifi_device);
+}
+#endif /* defined(CUSTOMER_HW_SAMSUNG) && defined(CONFIG_WIFI_CONTROL_FUNC) */
+
+#if defined(DHD_USE_STATIC_BUF) && defined(SAMSUNG_STATIC_BUF)
+
+#define DHD_PREALLOC_PROT_SIZE  	(12*1024)
+#define DHD_PREALLOC_RXBUF_SIZE		(12*1024)
+#define DHD_PREALLOC_DATABUF_SIZE	(32*1024)
+#define DHD_PREALLOC_OSL_BUF_SIZE	(16*1024)
+static int32 nStatic_allocated = 0;
+static void __iomem *static_ptr = NULL;
+
+#endif /* defined(DHD_USE_STATIC_BUF) && defined(SAMSUNG_STATIC_BUF) */
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27)) && defined(CONFIG_PM_SLEEP)
 #include <linux/suspend.h>
@@ -2378,6 +2508,9 @@ dhd_attach(osl_t *osh, struct dhd_bus *bus, uint bus_hdrlen)
 	 */
 	memcpy(netdev_priv(net), &dhd, sizeof(dhd));
 
+#if defined(CUSTOMER_HW_SAMSUNG) && defined(CONFIG_WIFI_CONTROL_FUNC)
+	g_bus = bus;
+#endif
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27)) && defined(CONFIG_PM_SLEEP)
 	register_pm_notifier(&dhd_sleep_pm_notifier);
 #endif /*  (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27)) && defined(CONFIG_PM_SLEEP) */
@@ -2900,6 +3033,9 @@ dhd_module_cleanup(void)
 	DHD_TRACE(("%s: Enter\n", __FUNCTION__));
 
 	dhd_bus_unregister();
+#if defined(CUSTOMER_HW_SAMSUNG) && defined(CONFIG_WIFI_CONTROL_FUNC)
+	wifi_del_dev();
+#endif
 	/* Call customer gpio to turn off power with WL_REG_ON signal */
 	dhd_customer_gpio_wlan_ctrl(WLAN_POWER_OFF);
 }
@@ -2930,6 +3066,25 @@ dhd_module_init(void)
 
 	/* Call customer gpio to turn on power with WL_REG_ON signal */
 	dhd_customer_gpio_wlan_ctrl(WLAN_POWER_ON);
+
+#if defined(CUSTOMER_HW_SAMSUNG) && defined(CONFIG_WIFI_CONTROL_FUNC)
+	sema_init(&wifi_control_sem, 0);
+
+	error = wifi_add_dev();
+	if (error) {
+		DHD_ERROR(("%s: platform_driver_register failed\n", __FUNCTION__));
+		goto fail_1;
+	}
+
+	/* Waiting callback after platform_driver_register is done or exit with error */
+	if (down_timeout(&wifi_control_sem,  msecs_to_jiffies(5000)) != 0) {
+		DHD_ERROR(("%s: platform_driver_register timeout\n", __FUNCTION__));
+		/* renove device */
+		wifi_del_dev();
+		goto fail_1;
+	}
+#endif /* #if defined(CUSTOMER_HW_SAMSUNG) && defined(CONFIG_WIFI_CONTROL_FUNC) */
+
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27))
 		sema_init(&dhd_registration_sem, 0);
 #endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27)) */
@@ -2939,6 +3094,9 @@ dhd_module_init(void)
 		printf("\n%s\n", dhd_version);
 	else {
 		DHD_ERROR(("%s: sdio_register_driver failed\n", __FUNCTION__));
+#if defined(CUSTOMER_HW_SAMSUNG) && defined(CONFIG_WIFI_CONTROL_FUNC)
+		wifi_del_dev();
+#endif
 		goto fail_1;
 	}
 
@@ -2952,6 +3110,9 @@ dhd_module_init(void)
 		error = -EINVAL;
 		DHD_ERROR(("%s: sdio_register_driver timeout\n", __FUNCTION__));
 		goto fail_2;
+#if defined(CUSTOMER_HW_SAMSUNG) && defined(CONFIG_WIFI_CONTROL_FUNC)
+		wifi_del_dev();
+#endif
 		}
 #endif
 
@@ -3240,14 +3401,10 @@ dhd_os_sdtxunlock(dhd_pub_t *pub)
 }
 
 #ifdef DHD_USE_STATIC_BUF
-
-#ifdef CUSTOMER_HW_SAMSUNG
-extern void *wlan_mem_prealloc(int section, unsigned long size);
-#endif
-
 void * dhd_os_prealloc(int section, unsigned long size)
 {
-#if defined(CONFIG_MACH_MAHIMAHI) && defined(CONFIG_WIFI_CONTROL_FUNC)
+#if defined(CUSTOMER_HW_SAMSUNG) && defined(CONFIG_WIFI_CONTROL_FUNC)
+#ifndef SAMSUNG_STATIC_BUF
 	void *alloc_ptr = NULL;
 	if (wifi_control_data && wifi_control_data->mem_prealloc)
 	{
@@ -3262,17 +3419,41 @@ void * dhd_os_prealloc(int section, unsigned long size)
 
 	DHD_ERROR(("can't alloc section %d\n", section));
 	return 0;
-#elif defined(CUSTOMER_HW_SAMSUNG)
+#else
+	u32 mem_start;	
+	u32 mem_size;	
 	void *alloc_ptr = NULL;
-	alloc_ptr = wlan_mem_prealloc(section, size);
-	if (alloc_ptr)
-	{
-		DHD_INFO(("success alloc section %d\n", section));
-		bzero(alloc_ptr, size);
-		return alloc_ptr;
+
+	if(nStatic_allocated == 0)	{	    
+		mem_start = (u32)s3c_get_media_memory_bank(S3C_MDEV_WIFI, 0);		
+		mem_size = (u32)s3c_get_media_memsize_bank(S3C_MDEV_WIFI, 0);		
+		DHD_INFO(("\nStarting memory Physical address for WIFI : 0x%x\n",mem_start));
+		static_ptr = ioremap(mem_start, mem_size);
+		nStatic_allocated =1;	
+	}	if(static_ptr ==  NULL)	{	    
+		DHD_ERROR(("\nioremap Failed  WIFI driver \n"));
+		return NULL;	
+	}	
+	switch(section)	{		
+		case DHD_PREALLOC_PROT:			
+			alloc_ptr =(void *)static_ptr;			
+			DHD_INFO(("BRCM WIFI VIRTUAL ADDRESS 0 : %x\n", (u32)alloc_ptr));			
+			break;		
+		case DHD_PREALLOC_RXBUF:			
+			alloc_ptr =(void *)(static_ptr+DHD_PREALLOC_PROT_SIZE);			
+			DHD_INFO(("BRCM WIFI VIRTUAL ADDRESS 1 : %x\n", (u32)alloc_ptr));			
+			break;		
+		case DHD_PREALLOC_DATABUF:			
+			alloc_ptr =(void *)(static_ptr+DHD_PREALLOC_PROT_SIZE+DHD_PREALLOC_RXBUF_SIZE);			
+			DHD_INFO(("BRCM WIFI VIRTUAL ADDRESS 2 : %x\n", (u32)alloc_ptr));			
+			break;		
+		case DHD_PREALLOC_OSL_BUF:			
+			alloc_ptr =(void *)(static_ptr+DHD_PREALLOC_PROT_SIZE+DHD_PREALLOC_RXBUF_SIZE+DHD_PREALLOC_DATABUF_SIZE);			
+			DHD_INFO(("BRCM WIFI VIRTUAL ADDRESS 3 : %x\n", (u32)alloc_ptr));			
+			break;			
 	}
-	DHD_ERROR(("can't alloc section %d\n", section));
-	return 0;
+	return (alloc_ptr);
+#endif /* SAMSUNG_STATIC_BUF */
 #else
 	return MALLOC(0, size);
 #endif /* #if defined(CONFIG_MACH_MAHIMAHI) && defined(CONFIG_WIFI_CONTROL_FUNC) */

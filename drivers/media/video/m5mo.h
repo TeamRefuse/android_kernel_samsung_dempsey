@@ -52,6 +52,12 @@ enum m5mo_cap_frmsize {
 	M5MO_CAPTURE_8MP, /* 3264 x 2448 */	
 };
 
+enum {
+	AUTO_FOCUS_FAILED,
+	AUTO_FOCUS_DONE,
+	AUTO_FOCUS_CANCELLED,
+};
+
 struct m5mo_control {
 	u32 id;
 	s32 value;	
@@ -99,6 +105,7 @@ struct m5mo_focus {
 };
 
 struct m5mo_exif {
+	char unique_id[7];
 	u32 exptime;	/* us */
 	u16 flash;
 	u16 iso;

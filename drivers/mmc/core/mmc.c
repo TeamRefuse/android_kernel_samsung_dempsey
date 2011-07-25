@@ -11,6 +11,7 @@
  */
 
 #include <linux/err.h>
+#include <linux/slab.h>
 
 #include <linux/mmc/host.h>
 #include <linux/mmc/card.h>
@@ -108,47 +109,29 @@ static int mmc_decode_cid(struct mmc_card *card)
 
 	return 0;
 }
-//[NAGSM_Android_HDLNC_SDcard_SEOJW_2011_01_12 : eMMC Trim add 
-#if defined (CONFIG_MMC_DISCARD) && defined (CONFIG_S5PC110_DEMPSEY_BOARD)
-static void mmc_set_erase_size(struct mmc_card *card)
-{
-	if (card->ext_csd.erase_group_def & 1)
-		card->erase_size = card->ext_csd.hc_erase_size;
-	else
-		card->erase_size = card->csd.erase_size;
-	mmc_init_erase(card);
-#ifdef CONFIG_MMC_DISCARD_MOVINAND
-	if (mmc_can_trim(card) && card->cid.manfid == MMC_CSD_MANFID_MOVINAND)
-		mmc_send_trimsize(card, &card->pref_trim);
-#endif /* CONFIG_MMC_DISCARD_MOVINAND */
-}
-#endif /* CONFIG_MMC_DISCARD */
+
 /*
  * Given a 128-bit response, decode to our card CSD structure.
  */
 static int mmc_decode_csd(struct mmc_card *card)
 {
 	struct mmc_csd *csd = &card->csd;
-//[NAGSM_Android_HDLNC_SDcard_SEOJW_2011_01_12 : eMMC Trim add 	
-#if defined (CONFIG_MMC_DISCARD) && defined (CONFIG_S5PC110_DEMPSEY_BOARD)
-	unsigned int e, m, csd_struct, a, b;
-#else /* CONFIG_MMC_DISCARD */
-	unsigned int e, m, csd_struct;
-#endif /* CONFIG_MMC_DISCARD */
+	unsigned int e, m;
 	u32 *resp = card->raw_csd;
 
 	/*
 	 * We only understand CSD structure v1.1 and v1.2.
 	 * v1.2 has extra information in bits 15, 11 and 10.
+	 * We also support eMMC v4.4 & v4.41.
 	 */
-	csd_struct = UNSTUFF_BITS(resp, 126, 2);
+	csd->structure = UNSTUFF_BITS(resp, 126, 2);
 #if defined(CONFIG_INAND_VERSION_PATCH)
-	if (csd_struct != 1 && csd_struct != 2 && csd_struct != 3) {
+	if (csd->structure != 1 && csd->structure != 2 && csd->structure != 3) {
 #else
-	if (csd_struct != 1 && csd_struct != 2) {
+	if (csd->structure != 1 && csd->structure != 2) {
 #endif
 		printk(KERN_ERR "%s: unrecognised CSD structure version %d\n",
-			mmc_hostname(card->host), csd_struct);
+			mmc_hostname(card->host), csd->structure);
 		return -EINVAL;
 	}
 
@@ -174,16 +157,7 @@ static int mmc_decode_csd(struct mmc_card *card)
 	csd->r2w_factor = UNSTUFF_BITS(resp, 26, 3);
 	csd->write_blkbits = UNSTUFF_BITS(resp, 22, 4);
 	csd->write_partial = UNSTUFF_BITS(resp, 21, 1);
-//[NAGSM_Android_HDLNC_SDcard_SEOJW_2011_01_12 : eMMC Trim add 
-#if defined (CONFIG_MMC_DISCARD) && defined (CONFIG_S5PC110_DEMPSEY_BOARD)
 
-   if (csd->write_blkbits >= 9) {
-		a = UNSTUFF_BITS(resp, 42, 5);
-		b = UNSTUFF_BITS(resp, 37, 5);
-		csd->erase_size = (a + 1) * (b + 1);
-		csd->erase_size <<= csd->write_blkbits - 9;
-	}
-#endif /* CONFIG_MMC_DISCARD */
 	return 0;
 }
 
@@ -240,11 +214,22 @@ static int mmc_read_ext_csd(struct mmc_card *card)
 		goto out;
 	}
 
+	/* Version is coded in the CSD_STRUCTURE byte in the EXT_CSD register */
+	if (card->csd.structure == 3) {
+		int ext_csd_struct = ext_csd[EXT_CSD_STRUCTURE];
+		if (ext_csd_struct > 2) {
+			printk(KERN_ERR "%s: unrecognised EXT_CSD structure "
+				"version %d\n", mmc_hostname(card->host),
+					ext_csd_struct);
+			err = -EINVAL;
+			goto out;
+		}
+	}
+
 	card->ext_csd.rev = ext_csd[EXT_CSD_REV];
 	if (card->ext_csd.rev > 5) {
-		printk(KERN_ERR "%s: unrecognised EXT_CSD structure "
-			"version %d\n", mmc_hostname(card->host),
-			card->ext_csd.rev);
+		printk(KERN_ERR "%s: unrecognised EXT_CSD revision %d\n",
+			mmc_hostname(card->host), card->ext_csd.rev);
 		err = -EINVAL;
 		goto out;
 	}
@@ -262,12 +247,6 @@ static int mmc_read_ext_csd(struct mmc_card *card)
 	}
 
 	switch (ext_csd[EXT_CSD_CARD_TYPE] & EXT_CSD_CARD_TYPE_MASK) {
-//[NAGSM_Android_HDLNC_SDcard_SEOJW_2011_01_12 : eMMC Trim add 	
-#if defined (CONFIG_MMC_DISCARD) && defined (CONFIG_S5PC110_DEMPSEY_BOARD)
-	case EXT_CSD_CARD_TYPE_TEMP |EXT_CSD_CARD_TYPE_52 | EXT_CSD_CARD_TYPE_26:
-		card->ext_csd.hs_max_dtr = 52000000;
-		break;
-#endif
 	case EXT_CSD_CARD_TYPE_52 | EXT_CSD_CARD_TYPE_26:
 		card->ext_csd.hs_max_dtr = 52000000;
 		break;
@@ -288,29 +267,7 @@ static int mmc_read_ext_csd(struct mmc_card *card)
 		if (sa_shift > 0 && sa_shift <= 0x17)
 			card->ext_csd.sa_timeout =
 					1 << ext_csd[EXT_CSD_S_A_TIMEOUT];
-//[NAGSM_Android_HDLNC_SDcard_SEOJW_2011_01_12 : eMMC Trim add 					
-#if defined (CONFIG_MMC_DISCARD) && defined (CONFIG_S5PC110_DEMPSEY_BOARD)
-      card->ext_csd.erase_group_def =
-				ext_csd[EXT_CSD_ERASE_GROUP_DEF];
-			card->ext_csd.hc_erase_timeout = 300 *
-				ext_csd[EXT_CSD_ERASE_TIMEOUT_MULT];
-			card->ext_csd.hc_erase_size =
-				ext_csd[EXT_CSD_HC_ERASE_GRP_SIZE] << 10;
-#endif /* CONFIG_MMC_DISCARD */
 	}
-//[NAGSM_Android_HDLNC_SDcard_SEOJW_2011_01_12 : eMMC Trim add 	
-#if defined (CONFIG_MMC_DISCARD) && defined (CONFIG_S5PC110_DEMPSEY_BOARD)
-   if (card->ext_csd.rev >= 4) {
-		card->ext_csd.sec_trim_mult =
-			ext_csd[EXT_CSD_SEC_TRIM_MULT];
-		card->ext_csd.sec_erase_mult =
-			ext_csd[EXT_CSD_SEC_ERASE_MULT];
-		card->ext_csd.sec_feature_support =
-			ext_csd[EXT_CSD_SEC_FEATURE_SUPPORT];
-		card->ext_csd.trim_timeout = 300 *
-			ext_csd[EXT_CSD_TRIM_MULT];
-	}
-#endif /* CONFIG_MMC_DISCARD */
 
 out:
 	kfree(ext_csd);
@@ -323,14 +280,6 @@ MMC_DEV_ATTR(cid, "%08x%08x%08x%08x\n", card->raw_cid[0], card->raw_cid[1],
 MMC_DEV_ATTR(csd, "%08x%08x%08x%08x\n", card->raw_csd[0], card->raw_csd[1],
 	card->raw_csd[2], card->raw_csd[3]);
 MMC_DEV_ATTR(date, "%02d/%04d\n", card->cid.month, card->cid.year);
-//[NAGSM_Android_HDLNC_SDcard_SEOJW_2011_01_12 : eMMC Trim add 
-#if defined (CONFIG_MMC_DISCARD) && defined (CONFIG_S5PC110_DEMPSEY_BOARD)
-MMC_DEV_ATTR(erase_size, "%u\n", card->erase_size << 9);
-MMC_DEV_ATTR(preferred_erase_size, "%u\n", card->pref_erase << 9);
-#ifdef CONFIG_MMC_DISCARD_MOVINAND
-MMC_DEV_ATTR(preferred_trim_size, "%u\n", card->pref_trim << 9);
-#endif /* CONFIG_MMC_DISCARD_MOVINAND */
-#endif /* CONFIG_MMC_DISCARD */
 MMC_DEV_ATTR(fwrev, "0x%x\n", card->cid.fwrev);
 MMC_DEV_ATTR(hwrev, "0x%x\n", card->cid.hwrev);
 MMC_DEV_ATTR(manfid, "0x%06x\n", card->cid.manfid);
@@ -342,14 +291,6 @@ static struct attribute *mmc_std_attrs[] = {
 	&dev_attr_cid.attr,
 	&dev_attr_csd.attr,
 	&dev_attr_date.attr,
-//[NAGSM_Android_HDLNC_SDcard_SEOJW_2011_01_12 : eMMC Trim add 	
-#if defined (CONFIG_MMC_DISCARD) && defined (CONFIG_S5PC110_DEMPSEY_BOARD)
-	&dev_attr_erase_size.attr,
-	&dev_attr_preferred_erase_size.attr,
-#ifdef CONFIG_MMC_DISCARD_MOVINAND
-	&dev_attr_preferred_trim_size.attr,
-#endif /* CONFIG_MMC_DISCARD_MOVINAND */
-#endif /* CONFIG_MMC_DISCARD */
 	&dev_attr_fwrev.attr,
 	&dev_attr_hwrev.attr,
 	&dev_attr_manfid.attr,
@@ -498,10 +439,6 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 		if (rocr[0] & 0x40000000)
 			mmc_card_set_blockaddr(card);
 #endif
-//[NAGSM_Android_HDLNC_SDcard_SEOJW_2011_01_12 : eMMC Trim add 
-#if defined (CONFIG_MMC_DISCARD) && defined (CONFIG_S5PC110_DEMPSEY_BOARD)
-		mmc_set_erase_size(card);
-#endif /* CONFIG_MMC_DISCARD */
 	}
 
 	/*
@@ -756,7 +693,7 @@ static void mmc_attach_bus_ops(struct mmc_host *host)
 {
 	const struct mmc_bus_ops *bus_ops;
 
-	if (host->caps & MMC_CAP_NONREMOVABLE)
+	if (host->caps & MMC_CAP_NONREMOVABLE || !mmc_assume_removable)
 		bus_ops = &mmc_ops_unsafe;
 	else
 		bus_ops = &mmc_ops;

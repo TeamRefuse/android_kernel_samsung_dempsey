@@ -126,7 +126,7 @@ static unsigned short sr130pc10_init_reg[] = {
 //PAGE0
 0x0300,
 0x100c,
-0x1191,
+0x1190, //un-mirrored
 0x1200,
 
 0x0300,
@@ -1289,7 +1289,7 @@ static unsigned short sr130pc10_init_vt_reg[] = {
 //PAGE0
 0x0300,
 0x101d,
-0x1195,
+0x1194, //un-mirrored
 0x1200,
 
 0x0300,
@@ -2409,7 +2409,7 @@ static unsigned short sr130pc10_preview_reg[] = {
 
 0x0300,
 0x101d,
-0x1191,
+0x1190, //un-mirrored
 
 0x2913,
 
@@ -2733,7 +2733,7 @@ static unsigned short sr130pc10_fps_7[] = {
 
 0x101d,
 
-0x1195,
+0x1194, //un-mirrored
 
 0x0300,
 0x9004,
@@ -2791,7 +2791,7 @@ static unsigned short sr130pc10_fps_10[] = {
 
 0x101d,
 
-0x1195,
+0x1194, //un-mirrored
 
 0x0300,
 0x0300,
@@ -2850,7 +2850,7 @@ static unsigned short sr130pc10_fps_15[] = {
 
 0x101d,
 
-0x1195,
+0x1194, //un-mirrored
 
 0x0300,
 0x9004,
@@ -2908,7 +2908,7 @@ static unsigned short sr130pc10_vt_fps_7[] = {
 
 0x101d,
 
-0x1195,
+0x1194, //un-mirrored
 
 0x0300,
 0x9004,
@@ -2965,7 +2965,7 @@ static unsigned short sr130pc10_vt_fps_10[] = {
 
 0x101d,
 
-0x1195,
+0x1194, //un-mirrored
 
 0x0300,
 0x9004,
@@ -3022,7 +3022,7 @@ static unsigned short sr130pc10_vt_fps_15[] = {
 
 0x101d,
 
-0x1195,
+0x1194, //un-mirrored
 
 0x0300,
 0x9004,

@@ -4,6 +4,8 @@
  * Copyright (C) 2003-2005,2008 David Brownell
  * Copyright (C) 2003-2004 Robert Schwebel, Benedikt Spranger
  * Copyright (C) 2008 Nokia Corporation
+ * Copyright (C) 2009 Samsung Electronics
+ *                    Author: Michal Nazarewicz (m.nazarewicz@samsung.com)
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -22,9 +24,11 @@
 
 /* #define VERBOSE_DEBUG */
 
+#include <linux/slab.h>
 #include <linux/kernel.h>
-#include <linux/device.h>
+#include <linux/platform_device.h>
 #include <linux/etherdevice.h>
+#include <linux/usb/android_composite.h>
 
 #include <asm/atomic.h>
 
@@ -72,6 +76,41 @@
  *
  *   - MS-Windows drivers sometimes emit undocumented requests.
  */
+
+/*
+ * Debugging macro and defines
+ */
+/* #undef CSY_DEBUG */
+//#define CSY_DEBUG
+
+#ifdef CSY_DEBUG
+#  define CSY_DBG(fmt, args...) \
+	printk(KERN_INFO "usb %s:%d "fmt, __func__, __LINE__, ##args)
+#else /* DO NOT PRINT LOG */
+#  define CSY_DBG(fmt, args...) do { } while (0)
+#endif /* CSY_DEBUG */
+
+#ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
+/*#define CSY_SAMSUNG_COMMAND_LOG */
+/*#define CSY_SAMSUNG_NO_IAD */
+
+/* soonyong.cho : For using RNDIS interface 0, 1.
+ *		  If RNDIS uses another interface number, host driver will have some problem.
+ */
+#  define CSY_SAMSUNG_FIX_IAD_INTERFACE_NUMBER
+
+#endif
+
+#ifdef CSY_DEBUG
+#undef DBG
+#  define DBG(devvalue, fmt, args...) \
+	printk(KERN_INFO "usb %s:%d "fmt, __func__, __LINE__, ##args)
+#endif
+#ifdef CSY_DEBUG
+#undef VDBG
+#  define VDBG(devvalue, fmt, args...) \
+	printk(KERN_INFO "usb %s:%d "fmt, __func__, __LINE__, ##args)
+#endif
 
 struct rndis_ep_descs {
 	struct usb_endpoint_descriptor	*in;
@@ -126,9 +165,16 @@ static struct usb_interface_descriptor rndis_control_intf = {
 	/* .bInterfaceNumber = DYNAMIC */
 	/* status endpoint is optional; this could be patched later */
 	.bNumEndpoints =	1,
+#ifdef CONFIG_USB_ANDROID_RNDIS_WCEIS
+	/* "Wireless" RNDIS; auto-detected by Windows */
+	.bInterfaceClass =	USB_CLASS_WIRELESS_CONTROLLER,
+	.bInterfaceSubClass = 1,
+	.bInterfaceProtocol =	3,
+#else
 	.bInterfaceClass =	USB_CLASS_COMM,
 	.bInterfaceSubClass =   USB_CDC_SUBCLASS_ACM,
 	.bInterfaceProtocol =   USB_CDC_ACM_PROTO_VENDOR,
+#endif
 	/* .iInterface = DYNAMIC */
 };
 
@@ -149,8 +195,8 @@ static struct usb_cdc_call_mgmt_descriptor call_mgmt_descriptor = {
 	.bDataInterface =	0x01,
 };
 
-static struct usb_cdc_acm_descriptor acm_descriptor = {
-	.bLength =		sizeof acm_descriptor,
+static struct usb_cdc_acm_descriptor rndis_acm_descriptor = {
+	.bLength =		sizeof rndis_acm_descriptor,
 	.bDescriptorType =	USB_DT_CS_INTERFACE,
 	.bDescriptorSubType =	USB_CDC_ACM_TYPE,
 
@@ -178,6 +224,29 @@ static struct usb_interface_descriptor rndis_data_intf = {
 	.bInterfaceProtocol =	0,
 	/* .iInterface = DYNAMIC */
 };
+
+#ifdef CSY_SAMSUNG_NO_IAD
+/* Nothing to do */
+#else
+static struct usb_interface_assoc_descriptor
+rndis_iad_descriptor = {
+	.bLength =		sizeof rndis_iad_descriptor,
+	.bDescriptorType =	USB_DT_INTERFACE_ASSOCIATION,
+
+	.bFirstInterface =	0, /* XXX, hardcoded */
+	.bInterfaceCount = 	2,	// control + data
+#  ifdef CONFIG_USB_ANDROID_SAMSUNG_RNDIS_WITH_MS_COMPOSITE
+	.bFunctionClass =	0xe0,
+	.bFunctionSubClass =	0x01,
+	.bFunctionProtocol =	0x03,
+#  else
+	.bFunctionClass =	USB_CLASS_COMM,
+	.bFunctionSubClass =	USB_CDC_SUBCLASS_ETHERNET,
+	.bFunctionProtocol =	USB_CDC_PROTO_NONE,
+#  endif
+	/* .iFunction = DYNAMIC */
+};
+#endif
 
 /* full speed support: */
 
@@ -208,11 +277,16 @@ static struct usb_endpoint_descriptor fs_out_desc = {
 };
 
 static struct usb_descriptor_header *eth_fs_function[] = {
+#ifdef CSY_SAMSUNG_NO_IAD
+ /* Nothing to do */
+#else
+	(struct usb_descriptor_header *) &rndis_iad_descriptor,
+#endif
 	/* control interface matches ACM, not Ethernet */
 	(struct usb_descriptor_header *) &rndis_control_intf,
 	(struct usb_descriptor_header *) &header_desc,
 	(struct usb_descriptor_header *) &call_mgmt_descriptor,
-	(struct usb_descriptor_header *) &acm_descriptor,
+	(struct usb_descriptor_header *) &rndis_acm_descriptor,
 	(struct usb_descriptor_header *) &rndis_union_desc,
 	(struct usb_descriptor_header *) &fs_notify_desc,
 	/* data interface has no altsetting */
@@ -252,11 +326,16 @@ static struct usb_endpoint_descriptor hs_out_desc = {
 };
 
 static struct usb_descriptor_header *eth_hs_function[] = {
+#ifdef CSY_SAMSUNG_NO_IAD
+ /* Nothing to do */
+#else
+	(struct usb_descriptor_header *) &rndis_iad_descriptor,
+#endif
 	/* control interface matches ACM, not Ethernet */
 	(struct usb_descriptor_header *) &rndis_control_intf,
 	(struct usb_descriptor_header *) &header_desc,
 	(struct usb_descriptor_header *) &call_mgmt_descriptor,
-	(struct usb_descriptor_header *) &acm_descriptor,
+	(struct usb_descriptor_header *) &rndis_acm_descriptor,
 	(struct usb_descriptor_header *) &rndis_union_desc,
 	(struct usb_descriptor_header *) &hs_notify_desc,
 	/* data interface has no altsetting */
@@ -266,17 +345,16 @@ static struct usb_descriptor_header *eth_hs_function[] = {
 	NULL,
 };
 
-/* used when rndis function is disabled */
-static struct usb_descriptor_header *null_rndis_descs[] = {
-	NULL,
-};
-
-
 /* string descriptors: */
 
 static struct usb_string rndis_string_defs[] = {
 	[0].s = "RNDIS Communications Control",
 	[1].s = "RNDIS Ethernet Data",
+#ifdef CSY_SAMSUNG_NO_IAD
+ /* Nothing to do */
+#else
+	[2].s = "RNDIS",
+#endif
 	{  } /* end of list */
 };
 
@@ -289,6 +367,10 @@ static struct usb_gadget_strings *rndis_strings[] = {
 	&rndis_string_table,
 	NULL,
 };
+
+#ifdef CONFIG_USB_ANDROID_RNDIS
+static struct usb_ether_platform_data *rndis_pdata;
+#endif
 
 /*-------------------------------------------------------------------------*/
 
@@ -337,6 +419,7 @@ static void rndis_response_complete(struct usb_ep *ep, struct usb_request *req)
 	struct usb_composite_dev	*cdev = rndis->port.func.config->cdev;
 	int				status = req->status;
 
+	CSY_DBG("rndis_response_complete req->length=0x%x\n", req->length);
 	/* after TX:
 	 *  - USB_CDC_GET_ENCAPSULATED_RESPONSE (ep0/control)
 	 *  - RNDIS_RESPONSE_AVAILABLE (status/irq)
@@ -378,10 +461,21 @@ static void rndis_command_complete(struct usb_ep *ep, struct usb_request *req)
 
 	/* received RNDIS command from USB_CDC_SEND_ENCAPSULATED_COMMAND */
 //	spin_lock(&dev->lock);
+#ifdef CSY_SAMSUNG_COMMAND_LOG
+	int i;
+	printk("usb rndis_command_complete buf=");
+	for(i=0; i < req->length; i++)
+	{
+		printk("%02x ", ((char*)req->buf)[i]);
+	}
+	printk("\n");
+#endif
 	status = rndis_msg_parser(rndis->config, (u8 *) req->buf);
 	if (status < 0)
 		ERROR(cdev, "RNDIS command error %d, %d/%d\n",
 			status, req->actual, req->length);
+
+	CSY_DBG("rndis_command_complete req->length=0x%x\n", req->length);
 //	spin_unlock(&dev->lock);
 }
 
@@ -396,6 +490,19 @@ rndis_setup(struct usb_function *f, const struct usb_ctrlrequest *ctrl)
 	u16			w_value = le16_to_cpu(ctrl->wValue);
 	u16			w_length = le16_to_cpu(ctrl->wLength);
 
+#ifdef CSY_DEBUG
+	u16			rt = ctrl->bRequestType << 8;
+	CSY_DBG("bRequestType=0x%x, ctrl->bRequest=0x%x, req->length=%d w_length=%d,rndis->ctrl_id=%d,w_index=%d\n", rt, ctrl->bRequest, req->length,w_length, rndis->ctrl_id, w_index);
+#endif
+
+#ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
+/* soonyong.cho : if you use composite framework and RNDIS is not first in all function list,
+                  you have to change w_index number. And please use RNDIS only if you possible.
+ */
+	if (w_index == 0)
+		w_index = rndis->ctrl_id;
+
+#endif
 	/* composite driver infrastructure handles everything except
 	 * CDC class messages; interface activation uses set_alt().
 	 */
@@ -406,6 +513,7 @@ rndis_setup(struct usb_function *f, const struct usb_ctrlrequest *ctrl)
 	 */
 	case ((USB_DIR_OUT | USB_TYPE_CLASS | USB_RECIP_INTERFACE) << 8)
 			| USB_CDC_SEND_ENCAPSULATED_COMMAND:
+		CSY_DBG("USB_CDC_SEND_ENCAPSULATED_COMMAND++\n");
 		if (w_length > req->length || w_value
 				|| w_index != rndis->ctrl_id)
 			goto invalid;
@@ -413,11 +521,13 @@ rndis_setup(struct usb_function *f, const struct usb_ctrlrequest *ctrl)
 		value = w_length;
 		req->complete = rndis_command_complete;
 		req->context = rndis;
+		CSY_DBG("USB_CDC_SEND_ENCAPSULATED_COMMAND--\n");
 		/* later, rndis_response_available() sends a notification */
 		break;
 
 	case ((USB_DIR_IN | USB_TYPE_CLASS | USB_RECIP_INTERFACE) << 8)
 			| USB_CDC_GET_ENCAPSULATED_RESPONSE:
+		CSY_DBG("USB_CDC_GET_ENCAPSULATED_COMMAND++\n");
 		if (w_value || w_index != rndis->ctrl_id)
 			goto invalid;
 		else {
@@ -432,6 +542,7 @@ rndis_setup(struct usb_function *f, const struct usb_ctrlrequest *ctrl)
 				rndis_free_response(rndis->config, buf);
 				value = n;
 			}
+			CSY_DBG("USB_CDC_GET_ENCAPSULATED_COMMAND--\n");
 			/* else stalls ... spec says to avoid that */
 		}
 		break;
@@ -450,6 +561,7 @@ invalid:
 			w_value, w_index, w_length);
 		req->zero = (value < w_length);
 		req->length = value;
+		CSY_DBG("rndis_setup value>=0, req->length=0x%x\n", req->length);
 		value = usb_ep_queue(cdev->gadget->ep0, req, GFP_ATOMIC);
 		if (value < 0)
 			ERROR(cdev, "rndis response on err %d\n", value);
@@ -467,6 +579,8 @@ static int rndis_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 
 	/* we know alt == 0 */
 
+	CSY_DBG("rndis_set_alt: intf=0x%x,rndis->ctrl_id=0x%x,rndis->data_id=0x%x,alt=0x%x",
+		intf, rndis->ctrl_id, rndis->data_id,alt);
 	if (intf == rndis->ctrl_id) {
 		if (rndis->notify->driver_data) {
 			VDBG(cdev, "reset rndis control %d\n", intf);
@@ -474,9 +588,9 @@ static int rndis_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 		} else {
 			VDBG(cdev, "init rndis ctrl %d\n", intf);
 		}
-			rndis->notify_desc = ep_choose(cdev->gadget,
-					rndis->hs.notify,
-					rndis->fs.notify);
+		rndis->notify_desc = ep_choose(cdev->gadget,
+				rndis->hs.notify,
+				rndis->fs.notify);
 		usb_ep_enable(rndis->notify, rndis->notify_desc);
 		rndis->notify->driver_data = rndis;
 
@@ -491,10 +605,10 @@ static int rndis_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 		if (!rndis->port.in) {
 			DBG(cdev, "init rndis\n");
 		}
-			rndis->port.in = ep_choose(cdev->gadget,
-					rndis->hs.in, rndis->fs.in);
-			rndis->port.out = ep_choose(cdev->gadget,
-					rndis->hs.out, rndis->fs.out);
+		rndis->port.in = ep_choose(cdev->gadget,
+				rndis->hs.in, rndis->fs.in);
+		rndis->port.out = ep_choose(cdev->gadget,
+				rndis->hs.out, rndis->fs.out);
 
 		/* Avoid ZLPs; they can be troublesome. */
 		rndis->port.is_zlp_ok = false;
@@ -515,6 +629,7 @@ static int rndis_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 
 		DBG(cdev, "RNDIS RX/TX early activation ... \n");
 		net = gether_connect(&rndis->port);
+		CSY_DBG("gether_connect ret=0x%p\n", net);
 		if (IS_ERR(net))
 			return PTR_ERR(net);
 
@@ -580,7 +695,7 @@ static void rndis_close(struct gether *geth)
 
 /* ethernet function driver setup/binding */
 
-static int __init
+static int
 rndis_bind(struct usb_configuration *c, struct usb_function *f)
 {
 	struct usb_composite_dev *cdev = c->cdev;
@@ -593,6 +708,15 @@ rndis_bind(struct usb_configuration *c, struct usb_function *f)
 	if (status < 0)
 		goto fail;
 	rndis->ctrl_id = status;
+#ifdef CSY_SAMSUNG_NO_IAD
+ /* Nothing to do */
+#else
+#  ifdef CSY_SAMSUNG_FIX_IAD_INTERFACE_NUMBER
+		/* Nothing to do */
+#  else
+	rndis_iad_descriptor.bFirstInterface = status;
+#  endif
+#endif
 
 	rndis_control_intf.bInterfaceNumber = status;
 	rndis_union_desc.bMasterInterface0 = status;
@@ -640,6 +764,7 @@ rndis_bind(struct usb_configuration *c, struct usb_function *f)
 	if (!rndis->notify_req->buf)
 		goto fail;
 	rndis->notify_req->length = STATUS_BYTECOUNT;
+	CSY_DBG("rndis->notify->>length=0x%x\n", rndis->notify_req->length);
 	rndis->notify_req->context = rndis;
 	rndis->notify_req->complete = rndis_response_complete;
 
@@ -692,9 +817,12 @@ rndis_bind(struct usb_configuration *c, struct usb_function *f)
 	rndis_set_param_medium(rndis->config, NDIS_MEDIUM_802_3, 0);
 	rndis_set_host_mac(rndis->config, rndis->ethaddr);
 
-#if 1
-	if (rndis_set_param_vendor(rndis->config, 0x04E8, "SAMSUNG"))
-		goto fail;
+#ifdef CONFIG_USB_ANDROID_RNDIS
+	if (rndis_pdata) {
+		if (rndis_set_param_vendor(rndis->config, rndis_pdata->vendorID,
+					rndis_pdata->vendorDescr))
+			goto fail;
+	}
 #endif
 
 	/* NOTE:  all that is done without knowing or caring about
@@ -753,15 +881,9 @@ rndis_unbind(struct usb_configuration *c, struct usb_function *f)
 /* Some controllers can't support RNDIS ... */
 static inline bool can_support_rndis(struct usb_configuration *c)
 {
-	/* only two endpoints on sa1100 */
-	if (gadget_is_sa1100(c->cdev->gadget))
-		return false;
-
 	/* everything else is *presumably* fine */
 	return true;
 }
-
-static struct f_rndis	*the_rndis;
 
 /**
  * rndis_bind_config - add RNDIS network link to a configuration
@@ -775,7 +897,8 @@ static struct f_rndis	*the_rndis;
  * Caller must have called @gether_setup().  Caller is also responsible
  * for calling @gether_cleanup() before module unload.
  */
-int __init rndis_bind_config(struct usb_configuration *c, u8 ethaddr[ETH_ALEN])
+int
+rndis_bind_config(struct usb_configuration *c, u8 ethaddr[ETH_ALEN])
 {
 	struct f_rndis	*rndis;
 	int		status;
@@ -804,6 +927,16 @@ int __init rndis_bind_config(struct usb_configuration *c, u8 ethaddr[ETH_ALEN])
 			return status;
 		rndis_string_defs[1].id = status;
 		rndis_data_intf.iInterface = status;
+#ifdef CSY_SAMSUNG_NO_IAD
+ /* Nothing to do */
+#else
+		/* IAD iFunction label */
+		status = usb_string_id(c->cdev);
+		if (status < 0)
+			return status;
+		rndis_string_defs[2].id = status;
+		rndis_iad_descriptor.iFunction = status;
+#endif
 	}
 
 	/* allocate and initialize one new instance */
@@ -825,16 +958,16 @@ int __init rndis_bind_config(struct usb_configuration *c, u8 ethaddr[ETH_ALEN])
 	rndis->port.func.name = "rndis";
 	rndis->port.func.strings = rndis_strings;
 	/* descriptors are per-instance copies */
-	rndis->port.func.descriptors = eth_fs_function;
-	rndis->port.func.hs_descriptors = eth_hs_function;
-
 	rndis->port.func.bind = rndis_bind;
 	rndis->port.func.unbind = rndis_unbind;
 	rndis->port.func.set_alt = rndis_set_alt;
 	rndis->port.func.setup = rndis_setup;
 	rndis->port.func.disable = rndis_disable;
 
-	the_rndis = rndis;
+#ifdef CONFIG_USB_ANDROID_RNDIS
+	/* start disabled */
+	rndis->port.func.disabled = 1;
+#endif
 
 	status = usb_add_function(c, &rndis->port.func);
 	if (status) {
@@ -845,38 +978,59 @@ fail:
 	return status;
 }
 
-int rndis_function_config_changed(struct usb_composite_dev *cdev,	struct usb_configuration *c)
+#ifdef CONFIG_USB_ANDROID_RNDIS
+#include "rndis.c"
+
+static int rndis_probe(struct platform_device *pdev)
 {
-	struct f_rndis	*rndis = the_rndis;
-	int		status;
-	
-	printk(KERN_INFO "rndis_function_config_changed\n");
-
-	rndis->port.func.descriptors = eth_fs_function;
-	rndis->port.func.hs_descriptors = eth_hs_function;
-	rndis->port.func.bind = NULL;
-	
-	status = usb_add_function(c, &rndis->port.func);
-	if (status)
-		printk("usb_add_function failed\n");
-
-	/* allocate instance-specific interface IDs */
-	status = usb_interface_id(c, &rndis->port.func);
-	if (status < 0)
-		return status;
-	rndis->ctrl_id = status;
-
-	rndis_control_intf.bInterfaceNumber = status;
-	rndis_union_desc.bMasterInterface0 = status;
-
-	status = usb_interface_id(c, &rndis->port.func);
-	if (status < 0)
-		return status;
-	rndis->data_id = status;
-
-	rndis_data_intf.bInterfaceNumber = status;
-	rndis_union_desc.bSlaveInterface0 = status;
-
+	rndis_pdata = pdev->dev.platform_data;
 	return 0;
 }
 
+static struct platform_driver rndis_platform_driver = {
+	.driver = { .name = "rndis", },
+	.probe = rndis_probe,
+};
+
+int rndis_function_bind_config(struct usb_configuration *c)
+{
+	int ret;
+
+	if (!rndis_pdata) {
+		printk(KERN_ERR "rndis_pdata null in rndis_function_bind_config\n");
+		return -1;
+	}
+#ifdef CSY_SAMSUNG
+	CSY_DBG(
+#else
+	printk(KERN_INFO
+#endif
+		"rndis_function_bind_config MAC: %02X:%02X:%02X:%02X:%02X:%02X\n",
+		rndis_pdata->ethaddr[0], rndis_pdata->ethaddr[1],
+		rndis_pdata->ethaddr[2], rndis_pdata->ethaddr[3],
+		rndis_pdata->ethaddr[4], rndis_pdata->ethaddr[5]);
+
+	ret = gether_setup(c->cdev->gadget, rndis_pdata->ethaddr);
+	CSY_DBG("gether_setup ret=%d\n",ret);
+	if (ret == 0){
+		ret = rndis_bind_config(c, rndis_pdata->ethaddr);
+		CSY_DBG("rndis_bind_config ret=%d\n", ret);
+	}
+	return ret;
+}
+
+static struct android_usb_function rndis_function = {
+	.name = "rndis",
+	.bind_config = rndis_function_bind_config,
+};
+
+static int __init init(void)
+{
+	printk(KERN_INFO "f_rndis init\n");
+	platform_driver_register(&rndis_platform_driver);
+	android_register_function(&rndis_function);
+	return 0;
+}
+module_init(init);
+
+#endif /* CONFIG_USB_ANDROID_RNDIS */

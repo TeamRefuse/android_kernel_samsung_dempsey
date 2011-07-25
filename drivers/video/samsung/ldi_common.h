@@ -25,6 +25,7 @@
 #include <linux/lcd.h>
 #include <linux/backlight.h>
 
+
 #include <plat/gpio-cfg.h>
 
 //#include <plat/s5pv310.h>

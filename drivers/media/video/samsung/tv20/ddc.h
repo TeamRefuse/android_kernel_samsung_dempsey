@@ -1,5 +1,5 @@
-/* 
- * i2c ddc port 
+/*
+ * i2c ddc port
  */
 
 

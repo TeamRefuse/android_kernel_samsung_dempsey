@@ -100,10 +100,13 @@ struct s3c_platform_camera {
 struct s3c_platform_fimc {
 	const char			srclk_name[16];		/* source of interface clock name */
 	const char			clk_name[16];		/* interface clock name */
+	const char			lclk_name[16];		/* interface clock name */
 	u32				clk_rate;		/* clockrate for interface clock */
 	enum fimc_cam_index		default_cam;		/* index of default cam */
 	struct s3c_platform_camera	*camera[5];		/* FIXME */
 	int				hw_ver;
+	phys_addr_t			pmem_start;		/* starting physical address of memory region */
+	size_t				pmem_size;		/* size of memory region */
 
 	void				(*cfg_gpio)(struct platform_device *pdev);
 	int				(*clk_on)(struct platform_device *pdev, struct clk *clk);

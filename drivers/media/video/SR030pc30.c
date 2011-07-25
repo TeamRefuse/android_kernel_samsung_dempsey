@@ -13,9 +13,10 @@
 
 #include <linux/i2c.h>
 #include <linux/delay.h>
-#include <linux/version.h>
+#include <linux/vmalloc.h>
+#include <linux/rtc.h>
+#include <linux/completion.h>
 #include <media/v4l2-device.h>
-#include <media/v4l2-subdev.h>
 #include <media/v4l2-i2c-drv.h>
 #include <media/sr030pc30_platform.h>
 
@@ -28,7 +29,6 @@
 #include <plat/gpio-cfg.h>
 #include <mach/regs-gpio.h>
 #include <mach/regs-clock.h>
-#include <mach/max8998_function.h>
 
 #include <linux/vmalloc.h>
 #include <linux/fs.h>
@@ -422,228 +422,30 @@ static int SR030pc30_regs_write(struct v4l2_subdev *sd, unsigned short i2c_data[
 	return err;
 }				
 
-static void SR030pc30_ldo_en(bool onoff)
+static int SR030pc30_power_en(int onoff, struct v4l2_subdev *sd)
 {
-	if(onoff){
-		// 3M & VGA CAM_A_2.8V on
-		Set_MAX8998_PM_OUTPUT_Voltage(LDO12, VCC_2p800);
-		Set_MAX8998_PM_REG(ELDO12, 1);
+	struct i2c_client *client = v4l2_get_subdevdata(sd);
+	struct SR030pc30_platform_data *pdata;
 
-		// VGA CAM_D(core)_1.8V on
-		Set_MAX8998_PM_OUTPUT_Voltage(LDO15, VCC_1p800);
-		Set_MAX8998_PM_REG(ELDO15, 1);
+	pdata = client->dev.platform_data;
 
-		udelay(20); //20us
-		
-		// 3M CAM_D(core)_1.2V on
-		Set_MAX8998_PM_OUTPUT_Voltage(BUCK4, VCC_1p200);
-		Set_MAX8998_PM_REG(EN4, 1);
-
-		udelay(15);//15us
-		
-		// 3M&VGA CAM_IO_2.8V on
-		Set_MAX8998_PM_OUTPUT_Voltage(LDO16, VCC_2p800);
-		Set_MAX8998_PM_REG(ELDO16, 1);
-		
-		// 3M & VGA CAM_AF_2.8V_on
-		Set_MAX8998_PM_OUTPUT_Voltage(LDO11, VCC_2p800);
-		Set_MAX8998_PM_REG(ELDO11, 1);
-		
-	} else {
-		
-		// 3M &VGA CAM_IO_1.8V off
-		Set_MAX8998_PM_REG(ELDO16, 0);
-		
-		// 3M &VGA CAM_AF_2.8V off
-		Set_MAX8998_PM_REG(ELDO11, 0);
-
-		// 3M CAM_D_1.2V off
-		Set_MAX8998_PM_REG(EN4, 0);
-
-		// VGA CAM_D_1.2V off
-		Set_MAX8998_PM_REG(ELDO15, 0);
-	  
-		// 3M &VGA CAM_A_2.8V off
-		Set_MAX8998_PM_REG(ELDO12, 0);
-	}
-}
-
-static int SR030pc30_power_on(void)
-{
-	int err;
-	
-	printk("SR030pc30_power_on\n");
-
-	/* CAM_MEGA_EN - GPJ0(6) */
-	err = gpio_request(GPIO_CAM_MEGA_EN, "GPJ0");
-	if(err) {
-		printk(KERN_ERR "failed to request GPJ0 for camera control\n");
-		return err;
-	}
-
-	/* CAM_MEGA_nRST - GPJ1(5) */
-	err = gpio_request(GPIO_CAM_MEGA_nRST, "GPJ1");
-	if(err) {
-		printk(KERN_ERR "failed to request GPJ1 for camera control\n");
-		return err;
-	}
-
-	/* CAM_VGA_EN - GPJ1(2) */
-	err = gpio_request(S5PV210_GPJ1(2), "GPJ12");
-	if(err) {
-		printk(KERN_ERR "failed to request GPJ12 for camera control\n");
-		return err;
-	}
-
-	/* CAM_VGA_nRST - GPJ1(4) */
-	err = gpio_request(S5PV210_GPJ1(4), "GPJ14");
-	if(err) {
-		printk(KERN_ERR "failed to request GPJ14 for camera control\n");
-		return err;
-	}
-		
-	//LDO enable
-	SR030pc30_ldo_en(TRUE);
-
-	udelay(20); //20us
-
-	// VGA CAM_VGA_EN HIGH
-	gpio_direction_output(S5PV210_GPJ1(2), 0);
-	gpio_set_value(S5PV210_GPJ1(2), 1);
-
-	// Mclk enable
-	s3c_gpio_cfgpin(GPIO_CAM_MCLK, S5PV210_GPE1_3_CAM_A_CLKOUT);
-
-	udelay(10); //10us
-
-	// 3M CAM_MEGA_EN HIGH
-	gpio_direction_output(GPIO_CAM_MEGA_EN, 0);
-	gpio_set_value(GPIO_CAM_MEGA_EN, 1);
-
-	mdelay(6); //5ms
-
-	// 3M CAM_MEGA_nRST HIGH
-	gpio_direction_output(GPIO_CAM_MEGA_nRST, 0);
-	gpio_set_value(GPIO_CAM_MEGA_nRST, 1);
-
-	mdelay(7); // 6.5ms
-
-	// 3M CAM_MEGA_nRST LOW
-	gpio_direction_output(GPIO_CAM_MEGA_EN, 0);
-	gpio_set_value(GPIO_CAM_MEGA_EN, 0);
-
-	udelay(10); //10us
-
-	// VGA CAM_VGA_nRST HIGH
-	gpio_direction_output(S5PV210_GPJ1(4), 0);
-	gpio_set_value(S5PV210_GPJ1(4), 1);
-
-	msleep(50); //50ms
-
-	// VGA CAM_GPIO free
-	gpio_free(S5PV210_GPJ1(2));
-	gpio_free(S5PV210_GPJ1(4));
-
-	//CAM_GPIO free
-	gpio_free(GPIO_CAM_MEGA_EN);
-	gpio_free(GPIO_CAM_MEGA_nRST);
-	
-	return 0;
-}
-
-static int SR030pc30_power_off(void)
-{
-	int err;
-	
-	printk("SR030pc30_power_off\n");
-
-	/* CAM_MEGA_EN - GPJ0(6) */
-	err = gpio_request(GPIO_CAM_MEGA_EN, "GPJ0");
-	if(err) {
-		printk(KERN_ERR "failed to request GPJ0 for camera control\n");
-		return err;
-	}
-
-	/* CAM_MEGA_nRST - GPJ1(5) */
-	err = gpio_request(GPIO_CAM_MEGA_nRST, "GPJ1");
-	if(err) {
-		printk(KERN_ERR "failed to request GPJ1 for camera control\n");
-		return err;
-	}
-
-	/* CAM_VGA_EN - GPJ1(2) */
-	err = gpio_request(S5PV210_GPJ1(2), "GPJ12");
-	if(err) {
-		printk(KERN_ERR "failed to request GPJ12 for camera control\n");
-		return err;
-	}
-
-	/* CAM_VGA_nRST - GPJ1(4) */
-	err = gpio_request(S5PV210_GPJ1(4), "GPJ14");
-	if(err) {
-		printk(KERN_ERR "failed to request GPJ14 for camera control\n");
-		return err;
-	}
-		
-	// VGA CAM_VGA_nRST - GPJ1(4) LOW
-	gpio_direction_output(S5PV210_GPJ1(4), 1);
-	gpio_set_value(S5PV210_GPJ1(4), 0);
-
-	// 3M CAM_MEGA_nRST - GPJ1(5) LOW
-	gpio_direction_output(GPIO_CAM_MEGA_nRST, 1);
-	gpio_set_value(GPIO_CAM_MEGA_nRST, 0);
-
-	udelay(50); //50us
-
-	// 3M&VGA Mclk disable
-	s3c_gpio_cfgpin(GPIO_CAM_MCLK, 0);
-
-	// VGA CAM_VGA_EN - GPJ1(2) LOW
-	gpio_direction_output(S5PV210_GPJ1(2), 1);
-	gpio_set_value(S5PV210_GPJ1(2), 0);
-	
-	// 3M CAM_MEGA_EN - GPJ0(6) LOW
-	gpio_direction_output(GPIO_CAM_MEGA_EN, 1);
-	gpio_set_value(GPIO_CAM_MEGA_EN, 0);
-
-	//LDO disable
-	SR030pc30_ldo_en(FALSE);
-
-	// VGA CAM_GPIO free
-	gpio_free(S5PV210_GPJ1(2));
-	gpio_free(S5PV210_GPJ1(4));
-
-	//CAM_GPIO free
-	gpio_free(GPIO_CAM_MEGA_EN);
-	gpio_free(GPIO_CAM_MEGA_nRST);
-
-	return 0;
-}
-
-static int SR030pc30_power_en(int onoff)
-{
-	if(onoff) {
-		SR030pc30_power_on();
-	}
-
-	else {
-		SR030pc30_power_off();
-		s3c_i2c0_force_stop();
-	}
+	if (onoff == 1)
+		pdata->power_en(1);
+	else
+		pdata->power_en(0);
 
 	return 0;
 }
 
 static int SR030pc30_reset(struct v4l2_subdev *sd)
 {
-	SR030pc30_power_en(0);
+	SR030pc30_power_en(0,sd);
 	mdelay(5);
-	SR030pc30_power_en(1);
+	SR030pc30_power_en(1,sd);
 	mdelay(5);
 	SR030pc30_init(sd, 0);
 	return 0;
 }
-
 
 static struct v4l2_queryctrl SR030pc30_controls[] = {
 };
@@ -1065,7 +867,7 @@ static int SR030pc30_set_blur(struct v4l2_subdev *sd, struct v4l2_control *ctrl)
 	dev_dbg(&client->dev, "%s: value : %d \n", __func__, ctrl->value);
 	
 	printk(KERN_DEBUG "state->vt_mode : %d \n", state->vt_mode);
-	if(state->vt_mode == 1)
+	if(state->vt_mode)
 	{
 		switch(ctrl->value)
 		{
@@ -1247,7 +1049,7 @@ static int SR030pc30_s_ctrl(struct v4l2_subdev *sd, struct v4l2_control *ctrl)
 		break;
 		
 	case V4L2_CID_CAMERA_VGA_BLUR:
-		dev_dbg(&client->dev, "%s: V4L2_CID_CAMERA_FRAME_RATE\n", __func__);
+		dev_dbg(&client->dev, "%s: V4L2_CID_CAMERA_VGA_BLUR\n", __func__);
 		err = SR030pc30_set_blur(sd, ctrl);	
 		break;
 
@@ -1320,6 +1122,7 @@ static int SR030pc30_init(struct v4l2_subdev *sd, u32 val)
 	struct SR030pc30_state *state = to_state(sd);
 	int err = -EINVAL, i;
 	unsigned char read_value;
+	i2c_fail_check = 0;
 
 	//v4l_info(client, "%s: camera initialization start : state->vt_mode %d \n", __func__, state->vt_mode);
 	printk(KERN_DEBUG "camera initialization start, state->vt_mode : %d \n", state->vt_mode); 
@@ -1374,13 +1177,26 @@ static int SR030pc30_init(struct v4l2_subdev *sd, u32 val)
 	}
 	else
 	{
-		err = SR030pc30_regs_write(sd, SR030pc30_init_vt_reg, \
-					sizeof(SR030pc30_init_vt_reg), "SR030pc30_init_vt_reg");
-		if (err < 0)
+		if(state->vt_mode == 1)
 		{
-			v4l_info(client, "%s: register set failed\n", \
-			__func__);
-		}	
+			err = SR030pc30_regs_write(sd, SR030pc30_init_vt_reg, \
+						sizeof(SR030pc30_init_vt_reg), "SR030pc30_init_vt_reg");
+			if (err < 0)
+			{
+				v4l_info(client, "%s: register set failed\n", \
+				__func__);
+			}	
+		}
+		else
+		{
+			err = SR030pc30_regs_write(sd, SR030pc30_init_vt2_reg, \
+						sizeof(SR030pc30_init_vt2_reg), "SR030pc30_init_vt2_reg");
+			if (err < 0)
+			{
+				v4l_info(client, "%s: register set failed\n", \
+				__func__);
+			}	
+		}
 	}
 
 	if (err < 0) {

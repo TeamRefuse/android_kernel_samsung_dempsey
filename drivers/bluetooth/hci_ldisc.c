@@ -214,7 +214,7 @@ static int hci_uart_send_frame(struct sk_buff *skb)
 	struct hci_uart *hu;
 
 	if (!hdev) {
-		BT_ERR("Frame for uknown device (hdev=NULL)");
+		BT_ERR("Frame for unknown device (hdev=NULL)");
 		return -ENODEV;
 	}
 
@@ -383,7 +383,7 @@ static int hci_uart_register_dev(struct hci_uart *hu)
 
 	hu->hdev = hdev;
 
-	hdev->type = HCI_UART;
+	hdev->bus = HCI_UART;
 	hdev->driver_data = hu;
 
 	hdev->open  = hci_uart_open;
@@ -527,8 +527,7 @@ static int __init hci_uart_init(void)
 	hci_uart_ldisc.receive_buf	= hci_uart_tty_receive;
 	hci_uart_ldisc.write_wakeup	= hci_uart_tty_wakeup;
 	hci_uart_ldisc.owner		= THIS_MODULE;
-
-/* + STE block tty_register_ldisc() for Dempsey GPS */
+//++Adding scott
 #if 0
 	if ((err = tty_register_ldisc(N_HCI, &hci_uart_ldisc))) {
 		BT_ERR("HCI line discipline registration failed. (%d)", err);
@@ -536,6 +535,7 @@ static int __init hci_uart_init(void)
 	}
 #endif
 
+//--Adding scott
 #ifdef CONFIG_BT_HCIUART_H4
 	h4_init();
 #endif

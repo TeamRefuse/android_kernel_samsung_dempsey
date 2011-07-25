@@ -1,0 +1,2 @@
+kernel/drivers/mmc/host/sdhci.ko
+kernel/drivers/mmc/host/sdhci-s3c.ko

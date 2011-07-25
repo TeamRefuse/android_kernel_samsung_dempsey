@@ -27,8 +27,8 @@
 #include <linux/err.h>
 #include <linux/platform_device.h>
 #include <linux/regulator/driver.h>
-#include <linux/regulator/max8893.h>
-#include <linux/regulator/max8998.h>
+#include <linux/mfd/max8893.h>// ansari
+#include <linux/mfd/max8998.h>
 #include <linux/mutex.h>
 
 #include <linux/io.h>
@@ -39,10 +39,10 @@
 
 #include <mach/regs-gpio.h>
 #include <plat/gpio-cfg.h>
-#include <mach/gpio-bank.h>
+//#include <mach/gpio-bank.h> //ansari
 #include <mach/hardware.h>
 #include <mach/gpio.h>
-
+#include<linux/slab.h> //ansari
 #define DBG(fmt...)				//NAGSM_Android_SEL_Kernel_Aakash_20101005
 //#define DBG(fmt...) printk(fmt)
 

@@ -28,7 +28,7 @@
 #include <plat/gpio-cfg.h>
 #include <mach/regs-gpio.h>
 #include <mach/regs-clock.h>
-#include <mach/max8998_function.h>
+//#include <mach/max8998_function.h> //SJKIM_temp
 
 #include <linux/vmalloc.h>
 #include <linux/fs.h>
@@ -53,8 +53,10 @@
 #define DEFAULT_HEIGHT	480
 
 //NAGSM_HQ_CAMERA_LEESUNGKOO_20101231 : to support two type front camera
+#if 0
 extern int gcamera_sensor_front_type;
 extern int gcamera_sensor_front_checked;
+#endif
 
 /*
  * Specification
@@ -228,6 +230,7 @@ static int sr130pc10_i2c_write(struct v4l2_subdev *sd, unsigned short i2c_data[]
 }
 
 //NAGSM_HQ_CAMERA_LEESUNGKOO_20110103
+#if 0
 static int sr130pc10_check_sensorId(struct v4l2_subdev *sd)
 {
 	struct i2c_client *client = v4l2_get_subdevdata(sd);
@@ -257,6 +260,7 @@ static int sr130pc10_check_sensorId(struct v4l2_subdev *sd)
 
 	return err;
 } 
+#endif
 //NAGSM_HQ_CAMERA_LEESUNGKOO_20110103
 
 int sr130pc10_CamTunning_table_init(void)
@@ -882,6 +886,81 @@ static int sr130pc10_set_capture_start(struct v4l2_subdev *sd)
 	return err;
 }
 
+/* returns the real iso currently used by sensor due to lighting
+ * conditions, not the requested iso we sent using s_ctrl.
+ */
+static int sr130pc10_get_iso(struct v4l2_subdev *sd, struct v4l2_control *ctrl)
+{
+	int err;
+	struct i2c_client *client = v4l2_get_subdevdata(sd);
+	unsigned char read_value;
+	int gain;
+
+	err = sr130pc10_i2c_write_unit(client, 0x03, 0x20);
+	if (err < 0)
+		return err;
+
+	err = sr130pc10_i2c_read(client, 0xb0, &read_value);
+	if (err < 0)
+		return err;
+
+	gain = ((int)read_value * 100  / 32) + 50;
+
+	if (read_value < 125)
+		ctrl->value = ISO_50;
+	else if (read_value < 175)
+		ctrl->value = ISO_100;
+	else if (read_value < 250)
+		ctrl->value = ISO_200;
+	else if (read_value < 375)
+		ctrl->value = ISO_400;
+	else if (read_value < 550)
+		ctrl->value = ISO_800;
+	else
+		ctrl->value = ISO_1600;
+
+	dev_dbg(&client->dev, "%s: get iso == %d (0x%x)\n",
+			__func__, ctrl->value, read_value);
+
+	return err;
+}
+
+static int sr130pc10_get_shutterspeed(struct v4l2_subdev *sd,
+		struct v4l2_control *ctrl)
+{
+	struct i2c_client *client = v4l2_get_subdevdata(sd);
+	struct sr130pc10_state *state = to_state(sd);
+	unsigned char read_value;
+	int cintr;
+	int err;
+
+	err = sr130pc10_i2c_write_unit(client, 0x03, 0x20);
+	if (err < 0)
+		return err;
+
+	err = sr130pc10_i2c_read(client, 0x80, &read_value);
+	if (err < 0)
+		return err;
+	cintr = (int)read_value << 19;
+
+	err = sr130pc10_i2c_read(client, 0x81, &read_value);
+	if (err < 0)
+		return err;
+	cintr += (int)read_value << 11;
+
+	err = sr130pc10_i2c_read(client, 0x82, &read_value);
+	if (err < 0)
+		return err;
+	cintr += (int)read_value << 3;
+
+	ctrl->value =  cintr / 24000;
+
+	dev_dbg(&client->dev,
+			"%s: get shutterspeed == %d\n", __func__, ctrl->value);
+
+	return err;
+}
+
 static int sr130pc10_g_ctrl(struct v4l2_subdev *sd, struct v4l2_control *ctrl)
 {
 	struct i2c_client *client = v4l2_get_subdevdata(sd);
@@ -928,11 +1007,21 @@ static int sr130pc10_g_ctrl(struct v4l2_subdev *sd, struct v4l2_control *ctrl)
 		break;
 
 //NAGSM_HQ_CAMERA_LEESUNGKOO_20110103
+#if 0
 	case V4L2_CID_CAM_FRONT_SENSOR_TYPE:
 		err = sr130pc10_check_sensorId(sd);
 		break;
+#endif		
 //NAGSM_HQ_CAMERA_LEESUNGKOO_20110103	
 
+	case V4L2_CID_CAMERA_EXIF_ISO:
+		err = sr130pc10_get_iso(sd, ctrl);
+		break;
+
+	case V4L2_CID_CAMERA_EXIF_EXPTIME:
+		err = sr130pc10_get_shutterspeed(sd, ctrl);
+		break;
+		
 	default:
 		dev_err(&client->dev, "%s: no such ctrl\n", __func__);
 		break;
@@ -1044,8 +1133,10 @@ static int sr130pc10_init(struct v4l2_subdev *sd, u32 val)
 	unsigned char read_value;
 #endif
 
+	#if 0
 	if (!gcamera_sensor_front_checked) //NAGSM_HQ_CAMERA_LEESUNGKOO_20110223 : to support two type front camera
 		return -EIO;
+	#endif
 
 	//v4l_info(client, "%s: camera initialization start : state->vt_mode %d \n", __func__, state->vt_mode);
 	printk(KERN_DEBUG "camera initialization start, state->vt_mode : %d \n", state->vt_mode); 

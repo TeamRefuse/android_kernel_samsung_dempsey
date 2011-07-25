@@ -76,15 +76,10 @@ static long alarm_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		if (file->private_data == NULL &&
 		    cmd != ANDROID_ALARM_SET_RTC) {
 			spin_lock_irqsave(&alarm_slock, flags);
-			
-			//NAGSM_Android_SEL_Kernel_Aakash_20100503
-			//This code is disabled from original code in order to allow multiple access to RTC alarm set cmd
-			/*if (alarm_opened) {
+			if (alarm_opened) {
 				spin_unlock_irqrestore(&alarm_slock, flags);
 				return -EBUSY;
-			}*/
-			//NAGSM_Android_SEL_Kernel_Aakash_20100503
-			
+			}
 			alarm_opened = 1;
 			file->private_data = (void *)1;
 			spin_unlock_irqrestore(&alarm_slock, flags);

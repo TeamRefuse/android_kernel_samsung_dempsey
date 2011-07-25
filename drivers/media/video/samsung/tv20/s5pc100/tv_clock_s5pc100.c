@@ -16,8 +16,8 @@
 #include <linux/platform_device.h>
 #include <linux/clk.h>
 
-#include <asm/uaccess.h>
-#include <asm/io.h>
+#include <linux/uaccess.h>
+#include <linux/io.h>
 
 #include <plat/map.h>
 #include <plat/regs-clock.h>
@@ -31,7 +31,7 @@
 
 #ifdef S5P_TVOUT_CLK_DEBUG
 #define TVCLKPRINTK(fmt, args...) \
-	printk("\t\t[TVCLK] %s: " fmt, __FUNCTION__ , ## args)
+	printk(KERN_INFO "\t\t[TVCLK] %s: " fmt, __func__ , ## args)
 #else
 #define TVCLKPRINTK(fmt, args...)
 #endif
@@ -45,16 +45,17 @@ void __iomem		*tvclk_base;
 */
 
 void __s5p_tv_clk_init_hpll(unsigned int lock_time,
-			unsigned int mdiv,
-			unsigned int pdiv,
-			unsigned int sdiv)
+			    unsigned int mdiv,
+			    unsigned int pdiv,
+			    unsigned int sdiv)
 {
 	TVCLKPRINTK("%d,%d,%d,%d\n\r", lock_time, mdiv, pdiv, sdiv);
 
 	writel(HPLL_LOCKTIME(lock_time), S5P_HPLL_LOCK);
 	writel(MDIV(mdiv) | PDIV(pdiv) | SDIV(sdiv), S5P_HPLL_CON);
 
-	TVCLKPRINTK("0x%08x,0x%08x\n\r", readl(S5P_HPLL_LOCK), readl(S5P_HPLL_CON));
+	TVCLKPRINTK("0x%08x,0x%08x\n\r", readl(S5P_HPLL_LOCK),
+		readl(S5P_HPLL_CON));
 }
 
 void __s5p_tv_clk_hpll_onoff(bool en)
@@ -64,17 +65,18 @@ void __s5p_tv_clk_hpll_onoff(bool en)
 	if (en) {
 		writel(readl(S5P_HPLL_CON) | HPLL_ENABLE, S5P_HPLL_CON) ;
 
-		while (!HPLL_LOCKED(readl(S5P_HPLL_CON))) {
+		while (!HPLL_LOCKED(readl(S5P_HPLL_CON)))
 			msleep(1);
-		}
-	} else {
-		writel(readl(S5P_HPLL_CON) & ~HPLL_ENABLE, S5P_HPLL_CON);
-	}
 
-	TVCLKPRINTK("0x%08x,0x%08x\n\r", readl(S5P_HPLL_LOCK), readl(S5P_HPLL_CON));
+	} else
+		writel(readl(S5P_HPLL_CON) & ~HPLL_ENABLE, S5P_HPLL_CON);
+
+
+	TVCLKPRINTK("0x%08x,0x%08x\n\r", readl(S5P_HPLL_LOCK),
+		readl(S5P_HPLL_CON));
 }
 
-s5p_tv_clk_err __s5p_tv_clk_init_href(s5p_tv_clk_hpll_ref hpll_ref)
+enum s5p_tv_clk_err __s5p_tv_clk_init_href(enum s5p_tv_clk_hpll_ref hpll_ref)
 {
 	TVCLKPRINTK("(%d)\n\r", hpll_ref);
 
@@ -99,7 +101,8 @@ s5p_tv_clk_err __s5p_tv_clk_init_href(s5p_tv_clk_hpll_ref hpll_ref)
 	return S5P_TV_CLK_ERR_NO_ERROR;
 }
 
-s5p_tv_clk_err __s5p_tv_clk_init_mout_hpll(s5p_tv_clk_mout_hpll mout_hpll)
+enum s5p_tv_clk_err __s5p_tv_clk_init_mout_hpll(
+	enum s5p_tv_clk_mout_hpll mout_hpll)
 {
 	TVCLKPRINTK("(%d)\n\r", mout_hpll);
 
@@ -114,7 +117,8 @@ s5p_tv_clk_err __s5p_tv_clk_init_mout_hpll(s5p_tv_clk_mout_hpll mout_hpll)
 		break;
 
 	default:
-		TVCLKPRINTK(" invalid mout_hpll parameter = %d\n\r", mout_hpll);
+		TVCLKPRINTK(" invalid mout_hpll parameter = %d\n\r",
+			mout_hpll);
 		return S5P_TV_CLK_ERR_INVALID_PARAM;
 		break;
 	}
@@ -124,22 +128,26 @@ s5p_tv_clk_err __s5p_tv_clk_init_mout_hpll(s5p_tv_clk_mout_hpll mout_hpll)
 	return S5P_TV_CLK_ERR_NO_ERROR;
 }
 
-s5p_tv_clk_err __s5p_tv_clk_init_video_mixer(s5p_tv_clk_vmiexr_srcclk src_clk)
+enum s5p_tv_clk_err __s5p_tv_clk_init_video_mixer(
+	enum s5p_tv_clk_vmiexr_srcclk src_clk)
 {
 	TVCLKPRINTK("(%d)\n\r", src_clk);
 
 	switch (src_clk) {
 
 	case TVOUT_CLK_VMIXER_SRCCLK_CLK27M:
-		writel(((readl(S5P_CLK_SRC2) &VMIXER_SEL_MASK) | VMIXER_SEL_CLK27M), S5P_CLK_SRC2);
+		writel(((readl(S5P_CLK_SRC2) & VMIXER_SEL_MASK) |
+			VMIXER_SEL_CLK27M), S5P_CLK_SRC2);
 		break;
 
 	case TVOUT_CLK_VMIXER_SRCCLK_VCLK_54:
-		writel(((readl(S5P_CLK_SRC2) &VMIXER_SEL_MASK) | VMIXER_SEL_VCLK_54), S5P_CLK_SRC2);
+		writel(((readl(S5P_CLK_SRC2) & VMIXER_SEL_MASK) |
+			VMIXER_SEL_VCLK_54), S5P_CLK_SRC2);
 		break;
 
 	case TVOUT_CLK_VMIXER_SRCCLK_MOUT_HPLL:
-		writel(((readl(S5P_CLK_SRC2) &VMIXER_SEL_MASK) | VMIXER_SEL_MOUT_HPLL), S5P_CLK_SRC2);
+		writel(((readl(S5P_CLK_SRC2) & VMIXER_SEL_MASK) |
+			VMIXER_SEL_MOUT_HPLL), S5P_CLK_SRC2);
 		break;
 
 	default:
@@ -157,7 +165,8 @@ void __s5p_tv_clk_init_hdmi_ratio(unsigned int clk_div)
 {
 	TVCLKPRINTK("(%d)\n\r", clk_div);
 
-	writel((readl(S5P_CLK_DIV3)& HDMI_DIV_RATIO_MASK) | HDMI_DIV_RATIO(clk_div), S5P_CLK_DIV3);
+	writel((readl(S5P_CLK_DIV3) & HDMI_DIV_RATIO_MASK) |
+		HDMI_DIV_RATIO(clk_div), S5P_CLK_DIV3);
 
 	TVCLKPRINTK("(0x%08x)\n\r", readl(S5P_CLK_DIV3));
 }
@@ -170,11 +179,13 @@ void __s5p_tv_clk_set_vp_clk_onoff(bool clk_on)
 {
 	TVCLKPRINTK("(%d)\n\r", clk_on);
 
-	if (clk_on) {
-		writel(readl(S5P_CLKGATE_D12) | CLK_HCLK_VP_PASS, S5P_CLKGATE_D12);
-	} else {
-		writel(readl(S5P_CLKGATE_D12) & ~CLK_HCLK_VP_PASS, S5P_CLKGATE_D12);
-	}
+	if (clk_on)
+		writel(readl(S5P_CLKGATE_D12) | CLK_HCLK_VP_PASS,
+			S5P_CLKGATE_D12);
+	else
+		writel(readl(S5P_CLKGATE_D12) & ~CLK_HCLK_VP_PASS,
+			S5P_CLKGATE_D12);
+
 
 	TVCLKPRINTK("(0x%08x)\n\r", readl(S5P_CLKGATE_D12));
 }
@@ -183,11 +194,13 @@ void __s5p_tv_clk_set_vmixer_hclk_onoff(bool clk_on)
 {
 	TVCLKPRINTK("(%d)\n\r", clk_on);
 
-	if (clk_on) {
-		writel(readl(S5P_CLKGATE_D12) | CLK_HCLK_VMIXER_PASS, S5P_CLKGATE_D12);
-	} else {
-		writel(readl(S5P_CLKGATE_D12) & ~CLK_HCLK_VMIXER_PASS, S5P_CLKGATE_D12);
-	}
+	if (clk_on)
+		writel(readl(S5P_CLKGATE_D12) | CLK_HCLK_VMIXER_PASS,
+			S5P_CLKGATE_D12);
+	else
+		writel(readl(S5P_CLKGATE_D12) & ~CLK_HCLK_VMIXER_PASS,
+			S5P_CLKGATE_D12);
+
 
 	TVCLKPRINTK("(0x%08x)\n\r", readl(S5P_CLKGATE_D12));
 }
@@ -196,11 +209,13 @@ void __s5p_tv_clk_set_vmixer_sclk_onoff(bool clk_on)
 {
 	TVCLKPRINTK("(%d)\n\r", clk_on);
 
-	if (clk_on) {
-		writel(readl(S5P_SCLKGATE1) | CLK_SCLK_VMIXER_PASS, S5P_SCLKGATE1);
-	} else {
-		writel(readl(S5P_SCLKGATE1) & ~CLK_SCLK_VMIXER_PASS, S5P_SCLKGATE1);
-	}
+	if (clk_on)
+		writel(readl(S5P_SCLKGATE1) | CLK_SCLK_VMIXER_PASS,
+			S5P_SCLKGATE1);
+	else
+		writel(readl(S5P_SCLKGATE1) & ~CLK_SCLK_VMIXER_PASS,
+			S5P_SCLKGATE1);
+
 
 	TVCLKPRINTK("(0x%08x)\n\r", readl(S5P_SCLKGATE1));
 }
@@ -210,14 +225,18 @@ void __s5p_tv_clk_set_sdout_hclk_onoff(bool clk_on)
 	TVCLKPRINTK("(%d)\n\r", clk_on);
 
 	if (clk_on) {
-		writel((readl(S5P_CLKGATE_D12) | CLK_HCLK_SDOUT_PASS), S5P_CLKGATE_D12);
-		writel(readl(tvclk_base + 0x304) | VMIXER_OUT_SEL_SDOUT, tvclk_base + 0x304);
-	} else {
-		writel((readl(S5P_CLKGATE_D12) & ~CLK_HCLK_SDOUT_PASS), S5P_CLKGATE_D12);
+		writel((readl(S5P_CLKGATE_D12) | CLK_HCLK_SDOUT_PASS),
+			S5P_CLKGATE_D12);
+		writel(readl(tvclk_base + 0x304) | VMIXER_OUT_SEL_SDOUT,
+			tvclk_base + 0x304);
+	} else
+		writel((readl(S5P_CLKGATE_D12) & ~CLK_HCLK_SDOUT_PASS),
+			S5P_CLKGATE_D12);
 
-	}
 
-	TVCLKPRINTK("physical %p (0x%08x)\n\r", tvclk_base, readl(tvclk_base + 0x304));
+
+	TVCLKPRINTK("physical %p (0x%08x)\n\r", tvclk_base,
+		readl(tvclk_base + 0x304));
 
 	TVCLKPRINTK("after (0x%08x)\n\r", readl(S5P_CLKGATE_D12));
 }
@@ -226,13 +245,15 @@ void __s5p_tv_clk_set_sdout_sclk_onoff(bool clk_on)
 {
 	TVCLKPRINTK("(%d)\n\r", clk_on);
 
-	if (clk_on) {
-		writel((readl(S5P_SCLKGATE1) | CLK_SCLK_TV54_PASS | CLK_SCLK_VDAC54_PASS), 
-			S5P_SCLKGATE1);
-	} else {
-		writel((readl(S5P_SCLKGATE1) & (~CLK_SCLK_TV54_PASS & ~CLK_SCLK_VDAC54_PASS)), 
-			S5P_SCLKGATE1);
-	}
+	if (clk_on)
+		writel((readl(S5P_SCLKGATE1) | CLK_SCLK_TV54_PASS |
+			CLK_SCLK_VDAC54_PASS),
+		       S5P_SCLKGATE1);
+	else
+		writel((readl(S5P_SCLKGATE1) & (~CLK_SCLK_TV54_PASS &
+			~CLK_SCLK_VDAC54_PASS)),
+		       S5P_SCLKGATE1);
+
 
 	TVCLKPRINTK("(0x%08x)\n\r", readl(S5P_SCLKGATE1));
 }
@@ -242,13 +263,17 @@ void __s5p_tv_clk_set_hdmi_hclk_onoff(bool clk_on)
 	TVCLKPRINTK("(%d)\n\r", clk_on);
 
 	if (clk_on) {
-		writel((readl(S5P_CLKGATE_D12) | CLK_HCLK_HDMI_PASS), S5P_CLKGATE_D12);
-		writel(readl(tvclk_base + 0x304) | VMIXER_OUT_SEL_HDMI, tvclk_base + 0x304);
-	} else {
-		writel((readl(S5P_CLKGATE_D12) & ~CLK_HCLK_HDMI_PASS), S5P_CLKGATE_D12) ;
-	}
+		writel((readl(S5P_CLKGATE_D12) | CLK_HCLK_HDMI_PASS),
+			S5P_CLKGATE_D12);
+		writel(readl(tvclk_base + 0x304) | VMIXER_OUT_SEL_HDMI,
+			tvclk_base + 0x304);
+	} else
+		writel((readl(S5P_CLKGATE_D12) & ~CLK_HCLK_HDMI_PASS),
+			S5P_CLKGATE_D12) ;
 
-	TVCLKPRINTK("physical %p (0x%08x)\n\r", tvclk_base, readl(tvclk_base + 0x304));
+
+	TVCLKPRINTK("physical %p (0x%08x)\n\r", tvclk_base,
+		readl(tvclk_base + 0x304));
 
 	TVCLKPRINTK("after (0x%08x)\n\r", readl(S5P_CLKGATE_D12));
 }
@@ -257,11 +282,13 @@ void __s5p_tv_clk_set_hdmi_sclk_onoff(bool clk_on)
 {
 	TVCLKPRINTK("(%d)\n\r", clk_on);
 
-	if (clk_on) {
-		writel((readl(S5P_SCLKGATE1) | CLK_SCLK_HDMI_PASS), S5P_SCLKGATE1);
-	} else {
-		writel((readl(S5P_SCLKGATE1) &~CLK_SCLK_HDMI_PASS), S5P_SCLKGATE1);
-	}
+	if (clk_on)
+		writel((readl(S5P_SCLKGATE1) | CLK_SCLK_HDMI_PASS),
+			S5P_SCLKGATE1);
+	else
+		writel((readl(S5P_SCLKGATE1) & ~CLK_SCLK_HDMI_PASS),
+			S5P_SCLKGATE1);
+
 
 	TVCLKPRINTK("(0x%08x)\n\r", readl(S5P_SCLKGATE1));
 }
@@ -270,11 +297,13 @@ void __s5p_tv_clk_set_hdmi_i2c_clk_onoff(bool clk_on)
 {
 	TVCLKPRINTK("(%d)\n\r", clk_on);
 
-	if (clk_on) {
-		writel((readl(S5P_CLKGATE_D14) | CLK_PCLK_IIC_HDMI_PASS), S5P_CLKGATE_D14);
-	} else {
-		writel((readl(S5P_CLKGATE_D14) &~CLK_PCLK_IIC_HDMI_PASS), S5P_CLKGATE_D14);
-	}
+	if (clk_on)
+		writel((readl(S5P_CLKGATE_D14) | CLK_PCLK_IIC_HDMI_PASS),
+			S5P_CLKGATE_D14);
+	else
+		writel((readl(S5P_CLKGATE_D14) & ~CLK_PCLK_IIC_HDMI_PASS),
+			S5P_CLKGATE_D14);
+
 
 	TVCLKPRINTK("(0x%08x)\n\r", readl(S5P_CLKGATE_D14));
 }
@@ -284,8 +313,8 @@ void __s5p_tv_clk_set_hdmi_i2c_clk_onoff(bool clk_on)
 *  - start functions are only called under stopping tvout clock
 */
 void __s5p_tv_clk_start(bool vp_hclk_on,
-		bool sdout_hclk_on,
-		bool hdmi_hclk_on)
+			bool sdout_hclk_on,
+			bool hdmi_hclk_on)
 {
 	TVCLKPRINTK("(%d,%d,%d)\n\r", vp_hclk_on, sdout_hclk_on, hdmi_hclk_on);
 
@@ -294,11 +323,11 @@ void __s5p_tv_clk_start(bool vp_hclk_on,
 	__s5p_tv_clk_set_sdout_sclk_onoff(sdout_hclk_on);
 	__s5p_tv_clk_set_hdmi_hclk_onoff(hdmi_hclk_on);
 	__s5p_tv_clk_set_vmixer_hclk_onoff(true);
-	__s5p_tv_clk_set_vmixer_sclk_onoff(true);	
+	__s5p_tv_clk_set_vmixer_sclk_onoff(true);
 
-	if (hdmi_hclk_on) {
+	if (hdmi_hclk_on)
 		__s5p_tv_clk_hpll_onoff(true);
-	}
+
 }
 
 
@@ -320,6 +349,7 @@ void __s5p_tv_clk_stop(void)
 
 int __init __s5p_tvclk_probe(struct platform_device *pdev, u32 res_num)
 {
+
 	struct resource *res;
 	size_t	size;
 	int 	ret;
@@ -327,10 +357,10 @@ int __init __s5p_tvclk_probe(struct platform_device *pdev, u32 res_num)
 	res = platform_get_resource(pdev, IORESOURCE_MEM, res_num);
 
 	if (res == NULL) {
-		dev_err(&pdev->dev, 
+		dev_err(&pdev->dev,
 			"failed to get memory region resource\n");
 		ret = -ENOENT;
-		
+
 	}
 
 	size = (res->end - res->start) + 1;
@@ -338,20 +368,21 @@ int __init __s5p_tvclk_probe(struct platform_device *pdev, u32 res_num)
 	tvclk_mem = request_mem_region(res->start, size, pdev->name);
 
 	if (tvclk_mem == NULL) {
-		dev_err(&pdev->dev,  
+		dev_err(&pdev->dev,
 			"failed to get memory region\n");
 		ret = -ENOENT;
-		
+
 	}
 
 	tvclk_base = ioremap(res->start, size);
 
 	if (tvclk_base == NULL) {
-		dev_err(&pdev->dev,  
+		dev_err(&pdev->dev,
 			"failed to ioremap address region\n");
 		ret = -ENOENT;
-		
+
 	}
+
 	return ret;
 }
 
@@ -360,6 +391,7 @@ int __init __s5p_tvclk_release(struct platform_device *pdev)
 	iounmap(tvclk_base);
 
 	/* remove memory region */
+
 	if (tvclk_mem != NULL) {
 		if (release_resource(tvclk_mem))
 			dev_err(&pdev->dev,

@@ -5,7 +5,9 @@ extern int audience_probe(void);
 extern int audience_bypass(u8 *p);
 extern int audience_closetalk(u8 *p);
 extern int audience_fartalk(u8 *p);
+#if defined(CONFIG_S5PC110_DEMPSEY_BOARD)
 extern int audience_eartalk(u8 *p);
+#endif
 extern int audience_NS0(u8 *p);
 extern int audience_state(void);
 extern int factory_sub_mic_status(void);

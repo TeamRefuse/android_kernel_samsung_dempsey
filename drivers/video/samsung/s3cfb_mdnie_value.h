@@ -185,6 +185,8 @@ mDNIe_data_type mDNIe_Gallery[]=
 	0x0134,0xFFF8, //LSF 248
 	END_SEQ,0x0000,
 };
+
+
 #elif CONFIG_S5PC110_DEMPSEY_BOARD
 
 mDNIe_data_type mDNIe_Video[]= 

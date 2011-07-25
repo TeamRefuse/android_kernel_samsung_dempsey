@@ -1,16 +1,21 @@
 
 #include <linux/kernel.h>
+#include <linux/module.h>
 #include <linux/i2c.h>
 #include <linux/platform_device.h>
 #include <linux/timer.h>
 #include <linux/delay.h>
+#include <linux/slab.h>
+#include <mach/param.h>
 
 //#include <mach/gpio-jupiter.h>
-#include <asm/gpio.h> 
+//#include <asm/gpio.h> 
 #include <plat/gpio-cfg.h> 
-#include <mach/gpio.h>
+//#include <mach/gpio.h>
+#include <linux/gpio.h>
+#include <mach/gpio-aries.h>
 #include "A1026_dev.h"
-#if defined (CONFIG_S5PC110_DEMPSEY_BOARD)|| defined(CONFIG_S5PC110_CELOX_BOARD)
+#if defined (CONFIG_S5PC110_DEMPSEY_BOARD)
 #include "A1026_regs_dempsey.h"
 #else
 #include "A1026_regs.h"
@@ -41,17 +46,17 @@ enum A1025STATE {A1026SLEEP,A1026WAKEUP};
 enum A1025STATE A1026_state=A1026SLEEP;
 //]hdlnc_bp_ldj : 20100308
 extern unsigned int HWREV;
-#if defined (CONFIG_S5PC110_DEMPSEY_BOARD)|| defined(CONFIG_S5PC110_CELOX_BOARD)
-int prev_num_closetalk_data = 152;
-int prev_num_NS0_data = 152;
+
+#if defined (CONFIG_S5PC110_DEMPSEY_BOARD)
+int prev_num_closetalk_data = 248;
 int prev_num_bypass_data = 48;
-int prev_num_fartalk_data=192;
-int prev_num_eartalk_data=272;
+int prev_num_fartalk_data;
+int prev_num_NS0_data = 248;
 #else
-int prev_num_closetalk_data = 152;
-int prev_num_NS0_data = 152;
+int prev_num_closetalk_data = 248;
 int prev_num_bypass_data = 32;
-int prev_num_fartalk_data=192;
+int prev_num_fartalk_data;
+int prev_num_NS0_data = 248;
 #endif
 enum
 {
@@ -238,20 +243,21 @@ int A1026_dev_resume(void)
 int configureIO()
 {
 	//configure GPIOs for A1026
-#if defined (CONFIG_S5PC110_DEMPSEY_BOARD) || defined(CONFIG_S5PC110_CELOX_BOARD)
+#if defined(CONFIG_S5PC110_DEMPSEY_BOARD)
 
 	if (gpio_is_valid(GPIO_A1026_RST))
 	{
-		if (gpio_request(GPIO_A1026_RST, "GPIO_GPC12"))
-			debug("Failed to request GPIO_GPC12! \n");
+		if (gpio_request(GPIO_A1026_RST, "GPIO_A1026_RST"))
+			debug("Failed to request GPIO_A1026_RST! \n");
 //ldj_20100719	
 		gpio_direction_output(GPIO_A1026_RST, 1);
 //ldj_20100719
 	}
 
+
 	if (gpio_is_valid(GPIO_A1026_WAKEUP))
 	{
-		if (gpio_request(GPIO_A1026_WAKEUP, "GPIO_GPC14"))
+		if (gpio_request(GPIO_A1026_WAKEUP, "GPIO_A1026_WAKEUP"))
 			debug("Failed to request GPIO_A1026_WAKEUP! \n");
 		gpio_direction_output(GPIO_A1026_WAKEUP, 0);
 	}
@@ -265,19 +271,12 @@ int configureIO()
 //ldj_20100719
 	}
 
+
 	if (gpio_is_valid(GPIO_GPH11))
 	{
 		if (gpio_request(GPIO_GPH11, "GPIO_GPH11"))
 			debug("Failed to request GPIO_GPH11! \n");
 		gpio_direction_output(GPIO_GPH11, 0);
-	}
-	if (gpio_is_valid(GPIO_A1026_RST))
-	{
-		if (gpio_request(GPIO_A1026_RST, "GPIO_GPC12"))
-			debug("Failed to request GPIO_GPC12! \n");
-//ldj_20100719	
-		gpio_direction_output(GPIO_A1026_RST, 1);
-//ldj_20100719
 	}
 
 	if((HWREV == 0x08) || (HWREV == 0x04))	
@@ -362,18 +361,14 @@ static int powerup(void)
 	ret = configureIO();
 	if(!ret)
 	{
-		printk("configure error!! \n");
+	//	printk("configure error!! \n");
 	}
 #if defined (CONFIG_S5PC110_DEMPSEY_BOARD)|| defined(CONFIG_S5PC110_CELOX_BOARD)
-	//ldj : wakeuppin & HWreset by control GPIOs and then sleep for 3s
 	gpio_set_value(GPIO_A1026_WAKEUP, 1);
-	//ldj : HWreset and sleep for 50ms!!
-//ldj_20100719		
 	gpio_set_value(GPIO_A1026_RST, 0);
 	msleep(50);
 	gpio_set_value(GPIO_A1026_RST, 1);
 	msleep(50);
-//ldj_20100719
 #else
 	//ldj : wakeuppin & HWreset by control GPIOs and then sleep for 3s
 	gpio_set_value(GPIO_GPH11, 1);
@@ -387,12 +382,14 @@ static int powerup(void)
 
 	if((HWREV == 0x08) || (HWREV == 0x04))	
 	{	
-
+		printk("gpio_set_value(GPIO_GPH12, 0)");
 		debug("HWREV:%d\n",HWREV);
 	}
 	else //from 02 board
 	{
+		printk("gpio_set_value(GPIO_GPH12, 1)");
 		gpio_set_value(GPIO_GPH12, 1);
+	}
 #endif
 	//ldj : Download firmware.
 	ret = A1026Loadfirmware();
@@ -469,28 +466,8 @@ static int i2c_write(struct i2c_client *client, u8 reg, u16 num)
 void A1026SetFeature(unsigned int feature)
 {
 
-	int ret, i, j, index;
-	u8 buf[272]={0};
-	u8 buf_FT[4]={0x80, 0x15, 0x01, 0x06};
-	u8 buf_CT[4]={0x80, 0x15, 0x01, 0x02};
-	int num_data;
-	int count =0;
-
-	if((HWREV == 0x04)||(HWREV == 0x05) || (HWREV == 0x06))
-	{
-		prev_num_closetalk_data = 152;
-		prev_num_NS0_data = 152;
-		prev_num_bypass_data = 88;
-		prev_num_fartalk_data=192;
-		prev_num_eartalk_data=192;
-	}
-	else
-	{
-		prev_num_closetalk_data = 152;
-		prev_num_NS0_data = 152;
-		prev_num_bypass_data = 88;
-		prev_num_fartalk_data=192;
-	}
+	int ret, i;
+	u8 buf[4];
 											
 
 //[hdlnc_bp_ldj : 20100305
@@ -502,263 +479,75 @@ void A1026SetFeature(unsigned int feature)
 		case CLOSETALK:
 		{
 				printk("A1026SetFeature CLOSETALK mode \n");
-				
-				if((HWREV == 0x04)||(HWREV == 0x05) || (HWREV == 0x06))
-				{
-					num_data = audience_closetalk(buf_ct_tuning_A2020);			
-				}
-				else
-				{
-					num_data = audience_closetalk(buf_ct_tuning);	
-				}
+
+				int num_data = audience_closetalk(buf_ct_tuning);			
 		
 				if(num_data)
 				{
-					if((HWREV == 0x04)||(HWREV == 0x05) || (HWREV == 0x06))
-					{								
-						printk("[a2020 tuning data for write\n");
-//						for(i=0;i<num_data;i++) 
-//						printk("0x%x \n",buf_ct_tuning[i]);
-						ret = i2c_master_send(A1026_i2c_client, buf_ct_tuning_A2020, num_data);
-						prev_num_closetalk_data = num_data;
-					}else
-					{								
 						printk("[a1026 tuning data for write\n");
 //						for(i=0;i<num_data;i++) 
 //						printk("0x%x \n",buf_ct_tuning[i]);
 						ret = i2c_master_send(A1026_i2c_client, buf_ct_tuning, num_data);
 						prev_num_closetalk_data = num_data;
-					}
 				}
 				else
 				{
-					if((HWREV == 0x04)||(HWREV == 0x05) || (HWREV == 0x06))
-					{						
-						printk("[a2020 write prev command\n");
+						printk("[a1026 write prev command\n");
 //						for(i=0;i<prev_num_closetalk_data;i++) 
 //						printk("0x%x \n",buf_ct_tuning[i]);
-						ret = i2c_master_send(A1026_i2c_client, buf_ct_tuning_A2020, prev_num_closetalk_data);
-					}else
-					{						
-						printk("[a1026 write prev command\n");
-						//for(i=0;i<prev_num_closetalk_data;i++) 
-						//printk("0x%x \n",buf_ct_tuning[i]);
-						//for(i=0;i<10;i++)
-						//{
-							//msleep(20);
-							//ret = i2c_master_send(A1026_i2c_client, buf_ct_tuning, prev_num_closetalk_data);
-							//ret = i2c_master_send(A1026_i2c_client, buf_CT, 4);
-							for(j=0;j<prev_num_closetalk_data;(j=j+4)) 
-							{
-								ret=i2c_master_send(A1026_i2c_client, &buf_ct_tuning[j], 4);
-							}
-							j=0;
-							printk("A1026 CT mode = [%d]\n",ret);
-							#if 0
-							msleep(20);
-							ret = i2c_master_recv(A1026_i2c_client, buf, 4);
-							printk("A1026 CT 0x%x 0x%x 0x%x 0x%x\n",buf[0],buf[1],buf[2],buf[3]);
-							ret=strncmp(buf_CT,buf,4);
-							if(ret!=0) 
-							{
-								printk("A1026 CT mode faile ret = [%d]\n",ret);
-							}
-							else
-							{
-								printk("A1026 CT mode success ret = [%d]\n",ret);
-								break;
-							}
-							#endif
-						//}
-					}
+						ret = i2c_master_send(A1026_i2c_client, buf_ct_tuning, prev_num_closetalk_data);
 							
 				}						
 		}
 		break;
 		case FARTALK:
-		{
 			printk("A1026SetFeature FARTALK mode \n");
-			//if((HWREV == 0x04)||(HWREV == 0x05) || (HWREV == 0x06))
-			{
-
-				num_data = audience_fartalk(buf_fartalk_tuning);
-				
-				if(num_data)
-				{
-						printk("[a1026 tuning data for write\n");
-//						for(i=0;i<num_data;i++) 
-//						printk("0x%x \n",buf_bypass_tuning[i]);
-						ret = i2c_master_send(A1026_i2c_client, buf_fartalk_tuning, num_data);
-						prev_num_fartalk_data = num_data;
-				}
-				else
-				{
-						printk("[a1026 write prev command\n");
-						//for(i=0;i<prev_num_fartalk_data;i++) 
-						//for(i=0;i<10;i++)
-						//{
-							//msleep(20);
-							//ret = i2c_master_send(A1026_i2c_client, buf_fartalk_tuning, prev_num_fartalk_data);	
-							//ret = i2c_master_send(A1026_i2c_client, buf_FT, 4);
-							for(j=0;j<prev_num_fartalk_data;(j=j+4)) 
-							{
-								ret=i2c_master_send(A1026_i2c_client, &buf_fartalk_tuning[j], 4);
-							}
-							j=0;
-							printk("A1026 FT mode = [%d]\n",ret);
-							#if 0
-							msleep(20);
-							ret = i2c_master_recv(A1026_i2c_client, buf, 4);
-							printk("A1026 FT 0x%x 0x%x 0x%x 0x%x\n",buf[0],buf[1],buf[2],buf[3]);
-							ret=strncmp(buf_FT,buf,4);
-							if(ret!=0) 
-							{
-								printk("A1026 FT mode faile ret = [%d]\n",ret);
-							}
-							else
-							{
-								printk("A1026 FT mode success ret = [%d]\n i=[%d]",ret,i);
-								break;
-							}
-							#endif
-						//}
-				}					
-	
-			}
-		}
 			break;
 
 		case BYPASSMODE:
 		{
 			printk("A1026SetFeature BYPASSMODE mode \n");
 
-			if((HWREV == 0x04)||(HWREV == 0x05) || (HWREV == 0x06))
-			{
-				num_data = audience_bypass(buf_bypass_tuning_A2020);
-			}else
-			{
-				num_data = audience_bypass(buf_bypass_tuning);
-			}
+			int num_data = audience_bypass(buf_bypass_tuning);
 			
 			if(num_data)
 			{
-				if((HWREV == 0x04)||(HWREV == 0x05) || (HWREV == 0x06))
-				{
-					printk("[a2020 tuning data for write\n");
-//					for(i=0;i<num_data;i++) 
-//					printk("0x%x \n",buf_bypass_tuning[i]);
-					ret = i2c_master_send(A1026_i2c_client, buf_bypass_tuning_A2020, num_data);
-					prev_num_bypass_data = num_data;
-				}
-				else
-				{
 					printk("[a1026 tuning data for write\n");
 //					for(i=0;i<num_data;i++) 
 //					printk("0x%x \n",buf_bypass_tuning[i]);
 					ret = i2c_master_send(A1026_i2c_client, buf_bypass_tuning, num_data);
 					prev_num_bypass_data = num_data;
-				}	
 			}
 			else
 			{
-				if((HWREV == 0x04)||(HWREV == 0x05) || (HWREV == 0x06))
-				{			
-					printk("[a2020 write prev command\n");
+					printk("[a1026 write prev command\n");
 //					for(i=0;i<prev_num_bypass_data;i++) 
 //					printk("0x%x \n",buf_bypass_tuning[i]);
-					ret = i2c_master_send(A1026_i2c_client, buf_bypass_tuning_A2020, prev_num_bypass_data);							
-				}
-				else
-				{			
-					printk("[a1026 write prev command\n");
-					for(i=0;i<prev_num_bypass_data;(i=i+4)) 
-						ret=i2c_master_send(A1026_i2c_client, &buf_bypass_tuning[i], 4);
-//					printk("0x%x \n",buf_bypass_tuning[i]);
-					//ret = i2c_master_send(A1026_i2c_client, buf_bypass_tuning, prev_num_bypass_data);							
-				}
-			}	
+					ret = i2c_master_send(A1026_i2c_client, buf_bypass_tuning, prev_num_bypass_data);							
+			}				
 
 		}
 		break;
-		case EARTALK:
-		if((HWREV == 0x04)||(HWREV == 0x05) || (HWREV == 0x06))
-		{		
-			{
-			printk("A1026SetFeature ear mode \n");
-
-			num_data = audience_eartalk(buf_NS0_tuning);
-			
-			if(num_data)
-			{
-					printk("[a1026 tuning data for write\n");
-//					for(i=0;i<num_data;i++) 
-//					printk("0x%x \n",buf_NS0_tuning[i]);
-					ret = i2c_master_send(A1026_i2c_client, buf_eartalk_tuning, num_data);
-					prev_num_eartalk_data = num_data;
-			}
-			else
-			{
-					printk("[a1026 write prev command\n");
-					for(i=0;i<prev_num_eartalk_data;(i=i+4)) 
-						ret=i2c_master_send(A1026_i2c_client, &buf_eartalk_tuning[i], 4);
-//					printk("0x%x \n",buf_NS0_tuning[i]);
-					//ret = i2c_master_send(A1026_i2c_client, buf_eartalk_tuning, prev_num_eartalk_data);							
-			}		
-
-			}		
-		}
-		break;
-		
 		case NS0:
 			{
 			printk("A1026SetFeature NS0 mode \n");
 
-			if((HWREV == 0x04)||(HWREV == 0x05) || (HWREV == 0x06))
-			{	
-				num_data = audience_NS0(buf_NS0_tuning_A2020);
-			}
-			else
-			{	
-				num_data = audience_NS0(buf_NS0_tuning);
-			}
+			int num_data = audience_NS0(buf_NS0_tuning);
 			
 			if(num_data)
 			{
-				if((HWREV == 0x04)||(HWREV == 0x05) || (HWREV == 0x06))
-				{				
-					printk("[a2020 tuning data for write\n");
-//					for(i=0;i<num_data;i++) 
-//					printk("0x%x \n",buf_NS0_tuning[i]);
-					ret = i2c_master_send(A1026_i2c_client, buf_NS0_tuning_A2020, num_data);
-					prev_num_NS0_data = num_data;
-				}
-				else
-				{				
 					printk("[a1026 tuning data for write\n");
 //					for(i=0;i<num_data;i++) 
 //					printk("0x%x \n",buf_NS0_tuning[i]);
 					ret = i2c_master_send(A1026_i2c_client, buf_NS0_tuning, num_data);
 					prev_num_NS0_data = num_data;
-				}	
-				
 			}
 			else
 			{
-				if((HWREV == 0x04)||(HWREV == 0x05) || (HWREV == 0x06))
-				{				
-					printk("[a2020 write prev command\n");
+					printk("[a1026 write prev command\n");
 //					for(i=0;i<prev_num_NS0_data;i++) 
 //					printk("0x%x \n",buf_NS0_tuning[i]);
-					ret = i2c_master_send(A1026_i2c_client, buf_NS0_tuning_A2020, prev_num_NS0_data);	
-				}
-				else
-				{				
-					printk("[a1026 write prev command\n");
-					for(i=0;i<prev_num_NS0_data;(i=i+4)) 
-						ret=i2c_master_send(A1026_i2c_client, &buf_NS0_tuning[i], 4);
-//					printk("0x%x \n",buf_NS0_tuning[i]);
-					//ret = i2c_master_send(A1026_i2c_client, buf_NS0_tuning, prev_num_NS0_data);	
-				}	
+					ret = i2c_master_send(A1026_i2c_client, buf_NS0_tuning, prev_num_NS0_data);							
 			}		
 
 		}		
@@ -783,30 +572,18 @@ void A1026Sleep()
 //]hdlnc_bp_ldj : 20100308	
 	printk("A1026Sleep()\n");
 //[hdlnc_bp_ldj : 20100308
-	if((HWREV == 0x04)||(HWREV == 0x05) || (HWREV == 0x06)) // A2020
-	{	
-		do 
-		{
-			ret = i2c_master_send(A1026_i2c_client, sleep_cmd, 4);
-			if(ret!=4) printk("A1026 sleep fail, ret = %d\n", ret);
-			count++;
-			if(count>10) break;
-		}  while(ret!=4);
-	}
-	else
-	{	
-		do 
-		{
-			ret = i2c_master_send(A1026_i2c_client, sleep_cmd, 4);
-			msleep(20);
-			ret = i2c_master_recv(A1026_i2c_client, buf, 4);
-			printk("A1025Sleep 0x%x 0x%x 0x%x 0x%x\n",buf[0],buf[1],buf[2],buf[3]);
-			ret=strncmp(sleep_cmd,buf,4);
-			if(ret!=0) printk("A1026 sleep faile\n");
-			count++;
-			if(count>10) break;
-		}  while(ret!=0);
-	}	
+	do 
+	{
+		i2c_master_send(A1026_i2c_client, sleep_cmd, 4);
+		msleep(20);
+		ret = i2c_master_recv(A1026_i2c_client, buf, 4);
+		printk("A1025Sleep 0x%x 0x%x 0x%x 0x%x\n",buf[0],buf[1],buf[2],buf[3]);
+		ret=strncmp(sleep_cmd,buf,4);
+		if(ret!=0) printk("A1026 sleep faile\n");
+		count++;
+		if(count>10) break;
+	}  while(ret!=0);
+
 	printk("A1026Sleep() ret=%d\n",ret);
 //]hdlnc_bp_ldj : 20100308
 	
@@ -828,22 +605,17 @@ void A1026Wakeup()
 	msleep(10);
 	do
 	{
-	#if 0
+#if !defined(CONFIG_S5PC110_DEMPSEY_BOARD)
 		gpio_set_value(GPIO_GPH11, 1);
 		msleep(90);
 		gpio_set_value(GPIO_GPH11, 0);
 		msleep(20);
-	#endif
-	#if defined (CONFIG_S5PC110_DEMPSEY_BOARD)|| defined(CONFIG_S5PC110_CELOX_BOARD)
+#else
 		gpio_set_value(GPIO_A1026_WAKEUP, 1);
 		msleep(90);
 		gpio_set_value(GPIO_A1026_WAKEUP, 0);
 		msleep(30);
-	#else
-		gpio_set_value(GPIO_GPH11, 1);
-		msleep(90);
-		gpio_set_value(GPIO_GPH11, 0);
-		msleep(20);
+
 	#endif	
 	i2c_master_send(A1026_i2c_client, wakeup_cmd, 4);
 	msleep(20);
@@ -858,11 +630,11 @@ void A1026Wakeup()
 
 	printk("A1026Wakeup() ret=%d\n",ret);
 //]hdlnc_bp_ldj : 20100308
-#if 0
+#if !defined(CONFIG_S5PC110_DEMPSEY_BOARD)
 	gpio_set_value(GPIO_GPH11, 1);
-#endif
+#else
 	gpio_set_value(GPIO_A1026_WAKEUP, 1);
-
+#endif
 }
 //]hdlnc_bp_ldj : 20100305
 int A1026_Firmware_i2c_write(struct i2c_client *client)
@@ -915,21 +687,21 @@ int A1026_Firmware_i2c_write(struct i2c_client *client)
 				ret = i2c_master_send(A1026_i2c_client, &a1026_firmware_buf2[index], NUM_OF_BYTE);
 			if(ret != NUM_OF_BYTE)
 			{	
-				printk("A1026 firmware download error!\n");
+				printk("A1026 firmware download error1!\n");
 				return -1;
 			}
 		}	
-	if(1)	
+
+	if((HWREV == 0x08) || (HWREV == 0x04))	
 		ret = i2c_master_send(A1026_i2c_client, &a1026_firmware_buf[index + NUM_OF_BYTE], REMAINED_NUM);
 	else
 //		ret = i2c_master_send(A1026_i2c_client, &a1026_firmware_buf2[index + NUM_OF_BYTE], REMAINED_NUM);
 			ret = i2c_master_send(A1026_i2c_client, &a1026_firmware_buf2[index + NUM_OF_BYTE], 20);  //temp for B3024 firmaware binary 
-
+			printk("A1026 firmware download  ret = %d, REMAINED_NUM = %d\n", ret, REMAINED_NUM);
 	#endif		
-	
 	if(ret != REMAINED_NUM)
 	{
-		printk("A1026 firmware download error!\n");	
+		printk("A1026 firmware download error2!\n");	
 		return -1;
 	}
 	return 0;
@@ -948,13 +720,13 @@ static unsigned short A1026_normal_i2c[] = { I2C_CLIENT_END };
 static unsigned short A1026_ignore[] = { I2C_CLIENT_END };
 //static unsigned short A1026_i2c_probe[] = { 13, A1026_I2C_ADDRESS >> 1, I2C_CLIENT_END };
 static unsigned short A1026_i2c_probe[] = { 13, A1026_I2C_ADDRESS, I2C_CLIENT_END };
-
+/*
 static struct i2c_client_address_data A1026_addr_data = {
 	.normal_i2c = A1026_normal_i2c,
 	.ignore     = A1026_ignore,
 	.probe      = A1026_i2c_probe,
 };
-
+*/
 
 
 struct a1026_state {

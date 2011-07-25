@@ -2505,10 +2505,6 @@
 #define WM8994_AIF2DAC_BOOST_MASK               0x0C00  /* AIF2DAC_BOOST - [11:10] */
 #define WM8994_AIF2DAC_BOOST_SHIFT                  10  /* AIF2DAC_BOOST - [11:10] */
 #define WM8994_AIF2DAC_BOOST_WIDTH                   2  /* AIF2DAC_BOOST - [11:10] */
-#define WM8994_AIF2_MONO			0x0100  /* AIF2_MONO */
-#define WM8994_AIF2_MONO_MASK			0x0100  /* AIF2_MONO */
-#define WM8994_AIF2_MONO_SHIFT                  8  /* AIF2_MONO */
-#define WM8994_AIF2_MONO_WIDTH                  1  /* AIF2MONO */
 #define WM8994_AIF2DAC_COMP                     0x0010  /* AIF2DAC_COMP */
 #define WM8994_AIF2DAC_COMP_MASK                0x0010  /* AIF2DAC_COMP */
 #define WM8994_AIF2DAC_COMP_SHIFT                    4  /* AIF2DAC_COMP */

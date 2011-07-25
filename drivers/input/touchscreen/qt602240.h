@@ -23,6 +23,7 @@
 #define QT_STYLUS_ENABLE
 #define FEATUE_QT_INFOBLOCK_STATIC
 #define USE_TSP_EARLY_SUSPEND
+#define _SUPPORT_MULTITOUCH_
 
 #ifdef QT_FIRMUP_ENABLE
 #define QT_ATCOM_TEST
@@ -4634,7 +4635,6 @@ uint8_t QT_Boot(void);
 #define QT602240_I2C_BOOT_ADDR  0x24
 
 
-//#define IRQ_TOUCH_INT IRQ_GPIOINT
 #define IRQ_TOUCH_INT (IRQ_EINT_GROUP18_BASE+5) /* J0_5 */
 
 #undef QT602240_DEBUG
@@ -4655,7 +4655,7 @@ uint8_t QT_Boot(void);
 #endif
 
 
-#define DEBUG_PRESS 1
+#define DEBUG_PRESS 0
 
 #if DEBUG_PRESS 
 #define dprintk printk 
@@ -5122,7 +5122,7 @@ typedef struct
 {
   uint8_t  ctrl;                 /* LCENABLE */
   uint8_t  cmd;
-#if(NUM_OF_TOUCH_OBJECTS)
+#ifdef NUM_OF_TOUCH_OBJECTS
   siglim_t siglim[NUM_OF_TOUCH_OBJECTS];   /* LCMASK */
 #endif
 
@@ -5191,12 +5191,7 @@ typedef struct
 
 #if ENABLE_NOISE_TEST_MODE
 
-#if defined(CONFIG_ARIES_LATONA)
-#define TEST_POINT_NUM      7
-#else
 #define TEST_POINT_NUM      5
-#endif
-
 typedef enum 
 {
     QT_PAGE_UP         = 0x01,
@@ -5273,7 +5268,7 @@ typedef struct
 //#define _SUPPORT_TOUCH_AMPLITUDE_
 typedef struct
 {
-	uint16_t size_id;	/*!< (id>>8) + size */
+	uint16_t size;	/*!<  size */
 	int16_t pressure;	/*!< dn>0, up=0, none=-1 */
 	int16_t x;			/*!< X */
 	int16_t y;			/*!< Y */
@@ -5336,13 +5331,12 @@ U8 init_I2C(U8 I2C_address_arg);
 U8 read_mem(U16 start, U8 size, U8 *mem);
 U8 read_U16(U16 start, U16 *mem);
 U8 write_mem(U16 start, U8 size, U8 *mem);
-void init_hw_setting(void);
 
 void read_all_register(void);
 
 #ifdef USE_TSP_EARLY_SUSPEND
-static int qt602240_early_suspend(struct early_suspend *);
-static int qt602240_late_resume(struct early_suspend *);
+static void qt602240_early_suspend(struct early_suspend *);
+static void qt602240_late_resume(struct early_suspend *);
 #endif	/* USE_TSP_EARLY_SUSPEND */
 
 

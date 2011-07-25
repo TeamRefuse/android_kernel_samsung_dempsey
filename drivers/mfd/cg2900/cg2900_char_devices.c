@@ -41,7 +41,7 @@
 
 #define CG2900_CHAR_DEV_IOCTL_EVENT_RESET	1
 #define CG2900_CHAR_DEV_IOCTL_EVENT_CLOSED	2
-
+#define CG2900_CHAR_DEV_MAX_RETRIAL 3
 /* Internal type definitions */
 
 /**
@@ -201,6 +201,7 @@ static struct cg2900_callbacks char_cb = {
 static int char_dev_open(struct inode *inode, struct file *filp)
 {
 	int err = 0;
+	int recover_max_trial = 0; /* ++ daniel - port fail recovery */
 	struct char_dev_user *dev;
 
 	mutex_lock(&char_info->open_mutex);
@@ -220,15 +221,39 @@ static int char_dev_open(struct inode *inode, struct file *filp)
 
 	dev->reset_state = CG2900_CHAR_IDLE;
 
-	/* Register to CG2900 Driver */
-	dev->cpd_dev = cg2900_register_user(dev->name, &char_cb);
-	if (dev->cpd_dev)
-		dev->cpd_dev->user_data = dev;
-	else {
-		CG2900_ERR("Couldn't register to CPD for H:4 channel %s",
-			   dev->name);
-		err = -EACCES;
-	}
+   while(1)
+   { /* ++ daniel - port fail recovery */
+   	/* Register to CG2900 Driver */
+   	dev->cpd_dev = cg2900_register_user(dev->name, &char_cb);
+   	if (dev->cpd_dev)
+   	{ /* ++ daniel - port fail recovery */
+   	   CG2900_DBG("Register Success");
+   		dev->cpd_dev->user_data = dev;
+   		recover_max_trial = 0;
+   		goto error_handling; /* ++ daniel - port fail recovery */
+   	} /* ++ daniel - port fail recovery */
+   	else {
+   		CG2900_ERR("Couldn't register to CPD for H:4 channel %s",
+   			   dev->name); 
+   		err = -EACCES;
+/* ++ daniel - port fail recovery */   	
+   		if(recover_max_trial > 5) 
+   		{
+   		   dev->cpd_dev = NULL;
+   		   recover_max_trial = 0;     
+   		   goto error_handling;
+   		}//BUG_ON(1);
+   		else {
+   		   err = 0;
+   		   dev->cpd_dev = NULL;
+   		   recover_max_trial++;
+   		   CG2900_ERR("recover_max_trial = %d", recover_max_trial);
+   		   printk(KERN_ERR "recover_max_trial = %d", recover_max_trial);
+   		   schedule_timeout_interruptible(msecs_to_jiffies(100));
+   		}   		
+/* -- daniel - port fail recovery */    		
+   	}
+   } 
 
 error_handling:
 	mutex_unlock(&char_info->open_mutex);
@@ -345,7 +370,9 @@ static ssize_t char_dev_read(struct file *filp, char __user *buf, size_t count,
 	skb_pull(skb, bytes_to_copy);
 
 	if (skb->len > 0)
+	{
 		skb_queue_head(&dev->rx_queue, skb);
+   }		
 	else
 		kfree_skb(skb);
 

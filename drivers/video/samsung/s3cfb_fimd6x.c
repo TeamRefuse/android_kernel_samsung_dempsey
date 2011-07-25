@@ -128,13 +128,8 @@ int s3cfb_display_off(struct s3cfb_global *ctrl)
 	u32 cfg;
 
 	cfg = readl(ctrl->regs + S3C_VIDCON0);
-#if defined(CONFIG_HAWK_VER_B1_REAL_ADDED_FEATURE) //NAGSM_Android_HQ_KERNEL_CLEE_20100927:
-//In order to fix LCD tearing issue, we turn off display right now. (Previously, the display was turned off after a displaying frame ends.)
-//This modification was advised by ym.song, S.LSI
-#else
 	cfg &= ~S3C_VIDCON0_ENVID_ENABLE;
 	writel(cfg, ctrl->regs + S3C_VIDCON0);
-#endif
 
 	cfg &= ~S3C_VIDCON0_ENVID_F_ENABLE;
 	writel(cfg, ctrl->regs + S3C_VIDCON0);
@@ -166,10 +161,8 @@ int s3cfb_set_clock(struct s3cfb_global *ctrl)
 
 	/* fixed clock source: hclk */
 	cfg = readl(ctrl->regs + S3C_VIDCON0);
-
 	cfg &= ~(S3C_VIDCON0_CLKSEL_MASK | S3C_VIDCON0_CLKVALUP_MASK |
 		S3C_VIDCON0_VCLKEN_MASK | S3C_VIDCON0_CLKDIR_MASK);
-
 	cfg |= (S3C_VIDCON0_CLKVALUP_ALWAYS | S3C_VIDCON0_VCLKEN_NORMAL |
 		S3C_VIDCON0_CLKDIR_DIVIDED);
 
@@ -203,7 +196,7 @@ int s3cfb_set_clock(struct s3cfb_global *ctrl)
 	cfg |= S3C_VIDCON0_CLKVAL_F(div - 1);
 	writel(cfg, ctrl->regs + S3C_VIDCON0);
 
-	dev_info(ctrl->dev, "parent clock: %d, vclk: %d, vclk div: %d\n",
+	dev_dbg(ctrl->dev, "parent clock: %d, vclk: %d, vclk div: %d\n",
 			src_clk, vclk, div);
 
 	return 0;
@@ -226,13 +219,8 @@ int s3cfb_set_polarity(struct s3cfb_global *ctrl)
 	if (pol->inv_vsync)
 		cfg |= S3C_VIDCON1_IVSYNC_INVERT;
 
-#if defined(CONFIG_HAWK_VER_B1_REAL_ADDED_FEATURE) //NAGSM_Android_HQ_KERNEL_CLEE_20100908 : Setup Hawk Real Board Rev 0.1
-	if (pol->inv_vden)
-		cfg |= S3C_VIDCON1_IVDEN_NORMAL;
-#else
 	if (pol->inv_vden)
 		cfg |= S3C_VIDCON1_IVDEN_INVERT;
-#endif
 
 	writel(cfg, ctrl->regs + S3C_VIDCON1);
 
@@ -607,6 +595,18 @@ int s3cfb_set_buffer_address(struct s3cfb_global *ctrl, int id)
 		id, start_addr, end_addr);
 
 	return 0;
+}
+
+int s3cfb_set_alpha_value_width(struct s3cfb_global *ctrl, int id)
+{
+       struct fb_info *fb = ctrl->fb[id];
+       struct fb_var_screeninfo *var = &fb->var;
+
+       if (var->bits_per_pixel == 32 && var->transp.length > 0)
+               writel(1, ctrl->regs + S3C_BLENDCON);
+       else
+               writel(0, ctrl->regs + S3C_BLENDCON);
+
 }
 
 int s3cfb_set_alpha_blending(struct s3cfb_global *ctrl, int id)

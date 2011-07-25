@@ -686,6 +686,7 @@ int ld9040_ldi_init()
 			break;
 	}
 
+
 #if 0 //Original Function
 	const unsigned short *init_seq[] = {
 		LD9040_SEQ_SWRESET,

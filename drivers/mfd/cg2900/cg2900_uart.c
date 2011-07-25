@@ -47,8 +47,10 @@
 #define HCI_GNSS_H4_CHANNEL	0x09
 
 /* Timers used in milliseconds */
-#define UART_TX_TIMEOUT		100
-#define UART_RESP_TIMEOUT	1000
+/* ++ Hemant: Fix for baudrate issue */
+#define UART_TX_TIMEOUT		10
+/* ++ Hemant: Fix for baudrate issue */   
+#define UART_RESP_TIMEOUT	5000
 #ifdef CG2900_GPS_DSM_SUPPORT
 #define CG2900_DSM_ACK_TIMEOUT		1 // Time in ms for chip to ack with HOST_CTS change
 #endif /* CG2900_GPS_DSM_SUPPORT */
@@ -98,8 +100,8 @@
 /* Baud rate defines */
 #define ZERO_BAUD_RATE		0
 #define DEFAULT_BAUD_RATE	115200
-#define HIGH_BAUD_RATE	3000000
-
+#define HIGH_BAUD_RATE	2000000
+//#define HIGH_BAUD_RATE     115200
 
 /* HCI TTY line discipline value */
 #ifndef N_HCI
@@ -218,6 +220,13 @@ static int uart_high_baud = HIGH_BAUD_RATE;
 
 static DECLARE_WAIT_QUEUE_HEAD(uart_wait_queue);
 static void update_timer(void);
+#ifdef CG2900_GPS_DSM_SUPPORT
+extern void cg29xx_uart_enable(void);
+extern void cg29xx_uart_disable(void);
+extern int cg29xx_cts_gpio_level(void);
+extern int cg29xx_cts_gpio_pin_number(void);
+extern void cg29xx_rts_gpio_control(int flag);
+#endif /* CG2900_GPS_DSM_SUPPORT */
 
 /**
  * is_set_baud_rate_cmd() - Checks if data contains set baud rate hci cmd.
@@ -352,7 +361,9 @@ static bool set_tty_baud(struct tty_struct *tty, int baud)
 
 	/* Finally inform the driver */
 	if (tty->ops->set_termios)
+	{
 		tty->ops->set_termios(tty, old_termios);
+   }		
 	else {
 		CG2900_ERR("Can not set new baudrate.");
 		/* Copy back the old termios to restore old setting. */
@@ -429,13 +440,22 @@ static void finish_setting_baud_rate(struct tty_struct *tty)
 	 */
 	if (set_tty_baud(tty, uart_info->baud_rate)) {
 		CG2900_DBG("Setting termios to new baud rate");
-		SET_BAUD_STATE(BAUD_WAITING);
+		if (BAUD_SENDING == uart_info->baud_rate_state)
+			SET_BAUD_STATE(BAUD_WAITING);
 	} else
 		SET_BAUD_STATE(BAUD_IDLE);
+
+   /* ++ Hemant: Fix for baudrate issue */
+	/*
+	 * Give some time to the platform to change the baudrate
+	 */
+	schedule_timeout_interruptible(msecs_to_jiffies(UART_TX_TIMEOUT));
+   /* -- Hemant: Fix for baudrate issue */
 
 	/* Reenable the RTS Flow */
 	//tty_unthrottle(tty); // Not supported by Host
 	//cg29xx_rts_gpio_control(1);
+	cg29xx_uart_enable();
 
 #endif
 }
@@ -516,6 +536,7 @@ static void work_do_transmit(struct work_struct *work)
 	struct sk_buff *skb;
 	struct tty_struct *tty;
 	struct uart_work_struct *current_work;
+	bool unlock = true;
 
 	if (!work) {
 		CG2900_ERR("work == NULL");
@@ -548,15 +569,6 @@ static void work_do_transmit(struct work_struct *work)
 		int len;
 
 		/*
-		 * Tell TTY that there is data waiting and call the write
-		 * function.
-		 */
-		set_bit(TTY_DO_WRITE_WAKEUP, &tty->flags);
-		len = tty->ops->write(tty, skb->data, skb->len);
-		CG2900_INFO("Written %d bytes to UART of %d bytes in packet",
-			    len, skb->len);
-
-		/*
 		 * If it's set baud rate cmd set correct baud state and after
 		 * sending is finished inform the tty driver about the new
 		 * baud rate.
@@ -566,6 +578,14 @@ static void work_do_transmit(struct work_struct *work)
 			CG2900_INFO("UART set baud rate cmd found.");
 			SET_BAUD_STATE(BAUD_SENDING);
 		}
+		/*
+		 * Tell TTY that there is data waiting and call the write
+		 * function.
+		 */
+		set_bit(TTY_DO_WRITE_WAKEUP, &tty->flags);
+		len = tty->ops->write(tty, skb->data, skb->len);
+		CG2900_INFO("Written %d bytes to UART of %d bytes in packet",
+			    len, skb->len);
 
 		/* Remove the bytes written from the sk_buffer */
 		skb_pull(skb, len);
@@ -585,14 +605,20 @@ static void work_do_transmit(struct work_struct *work)
 		 * proper function to handle that cmd since it requires special
 		 * attention.
 		 */
-		if (BAUD_SENDING == uart_info->baud_rate_state)
+		if (BAUD_SENDING == uart_info->baud_rate_state) {
+			unlock = false;
+			mutex_unlock(&uart_info->tx_mutex);
 			finish_setting_baud_rate(tty);
+		}
 
 		kfree_skb(skb);
 		skb = skb_dequeue(&uart_info->tx_queue);
 	}
 
-	mutex_unlock(&uart_info->tx_mutex);
+/* ++Hemant: Unlock if previously locked */
+	if (unlock)
+		mutex_unlock(&uart_info->tx_mutex);
+/* --Hemant: Unlock if previously locked */
 
 finished:
 	kfree(current_work);
@@ -671,6 +697,9 @@ static int set_baud_rate(int baud)
 	/* Disable the RTS Flow */
 	//tty_throttle(tty); // Not supported by Host
 	//cg29xx_rts_gpio_control(0);
+/* ++Hemant: Baudrate Workaround */
+	cg29xx_rts_gpio_control(0);
+/* --Hemant: Baudrate Workaround */
 #endif /* BAUD_RATE_FIX */
 	/*
 	 * Store old baud rate so that we can restore it if something goes
@@ -704,6 +733,7 @@ static int set_baud_rate(int baud)
 	}
 
 	CG2900_DBG("Set baud rate cmd scheduled for sending.");
+	printk(KERN_ERR "Set baud rate cmd scheduled for sending.");
 
 	/*
 	 * Now wait for the command complete.
@@ -712,12 +742,18 @@ static int set_baud_rate(int baud)
 	wait_event_interruptible_timeout(uart_wait_queue,
 				((BAUD_SUCCESS == uart_info->baud_rate_state) ||
 				 (BAUD_FAIL    == uart_info->baud_rate_state)),
-				 msecs_to_jiffies(UART_RESP_TIMEOUT*5));
+				 msecs_to_jiffies(UART_RESP_TIMEOUT/50));/* ++ daniel - port fail recovery */
+				 
+
 	if (BAUD_SUCCESS == uart_info->baud_rate_state)
-		CG2900_DBG("Baudrate changed to %d baud", baud);
+		//CG2900_DBG("Baudrate changed to %d baud", baud);
+		printk(KERN_ERR "Baudrate changed to %d baud", baud);
+		
 	else {
-		CG2900_ERR("Failed to set new baudrate (%d)",
-			   uart_info->baud_rate_state);
+		//CG2900_ERR("Failed to set new baudrate (%d)",
+		//	   uart_info->baud_rate_state);
+      printk(KERN_ERR "Failed to set new baudrate (%d)",
+			   uart_info->baud_rate_state);			   
 		err = -EPERM;
 	}
 
@@ -804,11 +840,6 @@ static void sleep_timer_expired(unsigned long data)
 }
 
 #ifdef CG2900_GPS_DSM_SUPPORT
-extern void cg29xx_uart_enable(void);
-extern void cg29xx_uart_disable(void);
-extern int cg29xx_cts_gpio_level(void);
-extern int cg29xx_cts_gpio_pin_number(void);
-extern void cg29xx_rts_gpio_control(int flag);
 /**
  * enter_dsm() - Called when chip needs to be put in DSM Mode.
  *
@@ -827,6 +858,7 @@ void enter_dsm(void)
 	}
 	/* Disable the RTS Flow and apply BREAK on UART */
 	cg29xx_uart_disable();
+	mutex_unlock(&uart_info->sleep_mutex);
 	/* Wait some time to check the acknowledgement from chip for DSM */
 	schedule_timeout_interruptible(
 			msecs_to_jiffies(CG2900_DSM_ACK_TIMEOUT));
@@ -850,7 +882,6 @@ void enter_dsm(void)
 		SET_SLEEP_STATE(CHIP_AWAKE);
 	}
 
-	mutex_unlock(&uart_info->sleep_mutex);
 }
 
 /**
@@ -872,6 +903,7 @@ void exit_dsm(void)
 
 	/* Enable the RTS Flow and remove BREAK on UART */
 	cg29xx_uart_enable();
+	mutex_unlock(&uart_info->sleep_mutex);
 	/* Wait some time to check the acknowledgement from chip for DSM */
 	schedule_timeout_interruptible(
 			msecs_to_jiffies(CG2900_DSM_ACK_TIMEOUT));
@@ -887,7 +919,6 @@ void exit_dsm(void)
 			"chip still in DSM Mode");
 		SET_SLEEP_STATE(CHIP_ASLEEP);
 	}
-	mutex_unlock(&uart_info->sleep_mutex);
 }
 #endif /* CG2900_GPS_DSM_SUPPORT */
 
@@ -945,10 +976,10 @@ static int uart_open(struct cg2900_trans_dev *dev)
 		SET_BAUD_STATE(BAUD_IDLE);
 		return -EIO;
 	}
-
+ 
 #if 1	
 	/* Just return if there will be no change of baud rate */
-	if (uart_default_baud != uart_high_baud)
+	if (uart_default_baud != uart_high_baud)	
 		return set_baud_rate(uart_high_baud);
 	else
 		return 0;
@@ -1012,7 +1043,9 @@ static void uart_set_chip_power(bool chip_on)
 	tty_encode_baud_rate(tty, uart_baudrate, uart_baudrate);
 	/* Finally inform the driver */
 	if (tty->ops->set_termios)
+	{
 		tty->ops->set_termios(tty, old_termios);
+   }		
 	mutex_unlock(&(tty->termios_mutex));
 	kfree(old_termios);
 #else /* BAUD_RATE_FIX */

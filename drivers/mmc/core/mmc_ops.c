@@ -9,6 +9,7 @@
  * your option) any later version.
  */
 
+#include <linux/slab.h>
 #include <linux/types.h>
 #include <linux/scatterlist.h>
 
@@ -351,93 +352,7 @@ int mmc_send_ext_csd(struct mmc_card *card, u8 *ext_csd)
 	return mmc_send_cxd_data(card, card->host, MMC_SEND_EXT_CSD,
 			ext_csd, 512);
 }
-//[NAGSM_Android_HDLNC_SDcard_SEOJW_2011_01_12 : eMMC Trim add 
-#if defined (CONFIG_MMC_DISCARD_MOVINAND) && defined (CONFIG_S5PC110_DEMPSEY_BOARD)
-static int mmc_send_trimsize_cmd(struct mmc_card *card, u32 arg)
-{
-	int err;
-    unsigned int timeout = 0;
-	struct mmc_command cmd;
-	u32 status;
-	BUG_ON(!card);
-	BUG_ON(!card->host);
-	memset(&cmd, 0, sizeof(struct mmc_command));
-    	cmd.opcode = 62;
-    	cmd.arg = arg;
-    	cmd.flags = MMC_RSP_SPI_R1B | MMC_RSP_R1B | MMC_CMD_AC;
-	err = mmc_wait_for_cmd(card->host, &cmd, MMC_CMD_RETRIES);
-	if (err)
-		return err;
-    while (timeout < 0xF0000) {
-		mmc_send_status(card, &status);
-		if(((status >> 9) & 0xF) == 0x4) break;
-			timeout++;
-	}
-    if (timeout >= 0xF0000) {
-        printk("mmc_get_trim_size() : Time-out waiting for releasing DAT0\r\n");
-        return 0;
-    }
-	return 0;
-}
-static int mmc_read_trimsize_data(struct mmc_host *host, u32 *trimsize)
-{
-	struct mmc_request mrq;
-	struct mmc_command cmd;
-	struct mmc_data data;
-	struct scatterlist sg;
-	u8 *buf;
-	unsigned int len = 512;
-	buf = kmalloc(len, GFP_KERNEL);
-	if (buf == NULL)
-		return -ENOMEM;
-	memset(&mrq, 0, sizeof(struct mmc_request));
-	memset(&cmd, 0, sizeof(struct mmc_command));
-	memset(&data, 0, sizeof(struct mmc_data));
-	mrq.cmd = &cmd;
-	mrq.data = &data;
-	cmd.opcode = MMC_READ_SINGLE_BLOCK;
-	cmd.arg = 0;
-	cmd.flags = MMC_RSP_R1 | MMC_CMD_ADTC;
-	data.blksz = len;
-	data.blocks = 1;
-	data.flags = MMC_DATA_READ;
-	data.sg = &sg;
-	data.sg_len = 1;
-	sg_init_one(&sg, buf, len);
-	mmc_wait_for_req(host, &mrq);
-	*trimsize = (buf[84] << 0 |
-			buf[84 + 1] << 8 |
-			buf[84 + 2] << 16 |
-			buf[84 + 3] << 24);
-	*trimsize /= 512; /* in sectors */
-	kfree(buf);
-	if (cmd.error)
-		return cmd.error;
-	if (data.error)
-		return data.error;
-	return 0;
-}
-int mmc_send_trimsize(struct mmc_card *card, u32 *trimsize)
-{
-	int ret;
-	ret = mmc_send_trimsize_cmd(card, 0xEFAC62EC);
-	if (ret)
-		return ret;
-	ret = mmc_send_trimsize_cmd(card, 0xCCEE);
-	if (ret)
-		return ret;
-	ret = mmc_read_trimsize_data(card->host, trimsize);
-	if (ret)
-		return ret;
-	ret = mmc_send_trimsize_cmd(card, 0xEFAC62EC);
-	if (ret)
-		return ret;
-	ret = mmc_send_trimsize_cmd(card, 0xDECCEE);
-	if (ret)
-		return ret;
-	return 0;
-}
-#endif /* CONFIG_MMC_DISCARD_MOVINAND */
+
 int mmc_spi_read_ocr(struct mmc_host *host, int highcap, u32 *ocrp)
 {
 	struct mmc_command cmd;

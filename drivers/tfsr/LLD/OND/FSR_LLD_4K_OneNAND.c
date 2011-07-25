@@ -1,7 +1,5 @@
 /**
-
  *   @mainpage   Flex Sector Remapper : LinuStoreIII_1.2.0_b038-FSR_1.2.1p1_b139_RTM
-
  *
  *   @section Intro Intro
  *       Flash Translation Layer for Flex-OneNAND and OneNAND
@@ -573,7 +571,9 @@ PRIVATE const OneNAND4kSpec gstOND4kSpec[] = {
 
     /* 8Gb DDP */
     { 0x00EC, 0x0068, 0, 4096, 2, 1, 8, 16, 64, TRUE32, 50, 80, 45, 240, 500, 50000, 0x0202, 0x0C0C},
-    { 0x00EC, 0x0060, 0, 4096, 1, 1, 8, 16, 64, TRUE32, 50, 80, 45, 240, 500, 50000, 0x0101, 0x0E0E},
+
+    /* 8Gb MDP */
+    { 0x00EC, 0x0060, 0, 4096, 1, 1, 8, 16, 64, TRUE32, 50, 80, 45, 240, 500, 50000, 0x0202, 0x0C0C},
 
     /* 16Gb DDP */
     { 0x00EC, 0x0078, 0, 8192, 2, 1, 8, 16, 64, TRUE32, 50,160, 45, 240, 500, 50000, 0x0202, 0x0C0C},

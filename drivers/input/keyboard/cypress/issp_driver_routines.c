@@ -1,23 +1,20 @@
 // filename: ISSP_Driver_Routines.c
 #include "issp_revision.h"
-#ifdef CONFIG_REGULATOR_MAX8893
-#include <mach/max8998_function.h>
-#endif 
 #ifdef PROJECT_REV_304
 // Copyright 2006-2007, Cypress Semiconductor Corporation.
 //
-// This software is owned by Cypress Semiconductor Corporation (Cypress)
-// and is protected by and subject to worldwide patent protection (United
-// States and foreign), United States copyright laws and international
-// treaty provisions. Cypress hereby grants to licensee a personal,
-// non-exclusive, non-transferable license to copy, use, modify, create
-// derivative works of, and compile the Cypress Source Code and derivative
-// works for the sole purpose of creating custom software in support of
-// licensee product to be used only in conjunction with a Cypress integrated
-// circuit as specified in the applicable agreement. Any reproduction,
-// modification, translation, compilation, or representation of this
-// software except as specified above is prohibited without the express
-// written permission of Cypress.
+//THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND
+//CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+//INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+//MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+//DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS
+//BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+//CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT
+//OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
+//BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+//LIABILITY, WHETHER IN CONRTACT, STRICT LIABILITY, OR TORT (INCLUDING
+//NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+//SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 // Disclaimer: CYPRESS MAKES NO WARRANTY OF ANY KIND,EXPRESS OR IMPLIED,
 // WITH REGARD TO THIS MATERIAL, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
@@ -28,7 +25,7 @@
 // Cypress does not authorize its products for use as critical components in
 // life-support systems where a malfunction or failure may reasonably be
 // expected to result in significant injury to the user. The inclusion of
-// Cypressï¿?product in a life-support systems application implies that the
+// Cypressï¿½ product in a life-support systems application implies that the
 // manufacturer assumes all risk of such use and in doing so indemnifies
 // Cypress against all charges.
 //
@@ -52,6 +49,7 @@
 #include <linux/platform_device.h>
 #include <linux/input.h>
 #include <mach/regs-gpio.h>
+#include <mach/gpio-aries.h>
 #include <plat/gpio-cfg.h>
 #include <asm/gpio.h>
 #include <linux/miscdevice.h>
@@ -87,7 +85,10 @@ extern unsigned char firmware_data[];
 // ((((((((((((((((((((((( DEMO ISSP SUBROUTINE SECTION )))))))))))))))))))))))
 // ((((( Demo Routines can be deleted in final ISSP project if not used   )))))
 // ((((((((((((((((((((((((((((((((((((()))))))))))))))))))))))))))))))))))))))
-
+#if defined CONFIG_S5PC110_DEMPSEY_BOARD 
+/* enable ldo13 */
+extern int touchkey_ldo_on(bool on);
+#endif
 // ============================================================================
 // InitTargetTestData()
 // !!!!!!!!!!!!!!!!!!FOR TEST!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -434,36 +435,25 @@ void SetTargetVDDStrong(void)
 // ApplyTargetVDD()
 // Provide power to the target PSoC's Vdd pin through a GPIO.
 // ****************************************************************************
+
 void ApplyTargetVDD(void)
 {
-    #if 0
-    gpio_tlmm_config(LED_26V_EN);
-    gpio_tlmm_config(EXT_TSP_SCL);
-    gpio_tlmm_config(EXT_TSP_SDA);
-    gpio_tlmm_config(LED_RST);
-
-    gpio_out(LED_RST, GPIO_LOW_VALUE);
-    
-    clk_busy_wait(10);
-    
-    gpio_out(LED_26V_EN, GPIO_HIGH_VALUE);
-    #endif
+    int ret;
     gpio_direction_input(_3_TOUCH_SDA_28V);
     gpio_direction_input(_3_TOUCH_SCL_28V);
 
 #ifndef CONFIG_S5PC110_DEMPSEY_BOARD
     gpio_direction_output(_3_GPIO_TOUCH_EN, 1);
 #else
-	Set_MAX8998_PM_OUTPUT_Voltage(LDO13, VCC_3p200);	
-	Set_MAX8998_PM_REG(ELDO13, 1);
-#endif
+	/* enable ldo13 */
+	ret=touchkey_ldo_on(1);
+    if(ret==0)
+		printk(KERN_ERR"[Touchkey]regulator get fail!!!\n");
 
+
+#endif
     mdelay(1);
     
-//    for(temp=0; temp < 16;temp++) {
-//        clk_busy_wait(1000); // gave the more delay, changed the LDO
-//        dog_kick();
-//    }
 }
 
 // ********************* LOW-LEVEL ISSP SUBROUTINE SECTION ********************
@@ -477,21 +467,12 @@ void ApplyTargetVDD(void)
 // ****************************************************************************
 void RemoveTargetVDD(void)
 {
-    #if 0
-    gpio_tlmm_config(LED_26V_EN);
-    gpio_tlmm_config(EXT_TSP_SCL);
-    gpio_tlmm_config(EXT_TSP_SDA);
-    gpio_tlmm_config(EXT_TSP_RST);
-    
-    gpio_out(LED_26V_EN, GPIO_LOW_VALUE);
-    gpio_out(EXT_TSP_SCL, GPIO_LOW_VALUE);
-    gpio_out(EXT_TSP_SDA, GPIO_LOW_VALUE);
-    gpio_out(EXT_TSP_RST, GPIO_LOW_VALUE);
-    #endif
 #ifndef CONFIG_S5PC110_DEMPSEY_BOARD
     gpio_direction_output(_3_GPIO_TOUCH_EN, 0);
 #else
-	Set_MAX8998_PM_REG(ELDO13, 0);
+		/* disable ldo13 */
+	touchkey_ldo_on(0);
+
 #endif
 }
 #endif

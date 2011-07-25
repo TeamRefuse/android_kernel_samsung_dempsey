@@ -16,7 +16,7 @@ config FB_S3C
 config FB_S3C_SPLASH_SCREEN
         bool "SPLASH_SCREEN on LCD"
         depends on FB_S3C
-	default y
+	default n
 
 config FB_S3C_LCD_INIT
         bool "LCD init in kernel"
@@ -34,7 +34,7 @@ config FB_S3C_TRACE_UNDERRUN
 config FB_S3C_DEFAULT_WINDOW
 	int "Default Window (0-4)"
 	depends on FB_S3C
-	default "0"
+	default "2"
 	---help---
 	  This indicates the default window number, and which is used as console framebuffer
 
@@ -78,26 +78,15 @@ config FB_S3C_LTE480WV
 	---help---
 	  This enables support for Samsung LTE480WV 4.8\" WVGA LCD panel
 
-config FB_S3C_TL2796
-        bool "TL2796"
-        depends on (MACH_SMDKC110 || MACH_S5PC110_ARIES)
-        select SPI
-        select SPI_GPIO
-        select SPI_BITBANG
-        ---help---
-          This enables support for Samsung TL2796 WVGA LCD panel
-
-
 config FB_S3C_LDI
         bool "AMOLED DISPLAY"
-	depends on (MACH_SMDKC110 || MACH_S5PC110_ARIES)
+	depends on S5PC110_DEMPSEY_BOARD
 	select LCD_CLASS_DEVICE
 	select SPI
 	select SPI_GPIO
 	select SPI_BITBANG
 	help
 	  This enables support for LD9040 and EA8868 AMOLED panel
-
 config FB_S3C_HT101HD1
 	bool "HT101HD1"
 	depends on MACH_SMDKV210
@@ -107,25 +96,33 @@ endchoice
 
 config VIDEO_SAMSUNG_MEMSIZE_FIMD
 	int "Memory size in kbytes for FIMD"
+	depends on S5PC110_DEMPSEY_BOARD
 	depends on FB_S3C
 	default "3072"
 
-
-config FB_S3C_MDNIE
-	bool "Samsung MDNIE"
-	depends on FB_S3C
-	depends on (MACH_SMDKC110 || MACH_S5PC110_ARIES)
-	default "0"
-        depends on (MACH_SMDKC110 || MACH_S5PC110_ARIES || MACH_S5PC110_P1)
-	---help---
-	  This enables support for Samsung MDNIE feature
-
+config FB_S3C_uPD161224
+        bool "uPD161224"
+        depends on FB_S3C
+        select SPI
+        select SPI_GPIO
+        select SPI_BITBANG
+        ---help---
+          This enables support for TMD NEC uPD161224 WVGA LCD panel
+          
 config FB_S3C_MDNIE_TUNINGMODE_FOR_BACKLIGHT
-	depends on FB_S3C_MDNIE
+	depends on FB_S3C_MDNIE && S5PC110_DEMPSEY_BOARD
 	bool "mDNIe tuning mode for backlights"
 	default y
 	---help---
 		  This option enables to control mDNIe tuning for backlights.
+config FB_S3C_TL2796
+        bool "TL2796"
+        depends on FB_S3C
+        select SPI
+        select SPI_GPIO
+        select SPI_BITBANG
+        ---help---
+          This enables support for Samsung TL2796 WVGA LCD panel
 
 config FB_S3C_LVDS
 	bool "LVDS"
@@ -164,3 +161,9 @@ config FB_S3C_CMC623
 	default "0"
 	---help---
 	This enables support for Samsung CMC623 feature
+
+config VIBRANTPLUSTELUS_BOOT_LOGO
+        bool "T959P Boot Logo"
+        default n
+        ---help---
+          This flag is to support boot logo for Telus

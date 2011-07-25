@@ -36,6 +36,14 @@ struct android_usb_product {
 	 */
 	int num_functions;
 	char **functions;
+#ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
+/* soonyong.cho : Below variables are used for Samsung composite framework. */
+        __u8 bDeviceClass;
+	__u8 bDeviceSubClass;
+	__u8 bDeviceProtocol;
+	int  mode; /* if product id is same, you have to refer this mode value. */
+	char *s;
+#endif
 };
 
 struct android_usb_platform_data {
@@ -87,8 +95,6 @@ struct usb_ether_platform_data {
 	u32	vendorID;
 	const char *vendorDescr;
 };
-
-extern void android_usb_set_connected(int on);
 
 extern void android_register_function(struct android_usb_function *f);
 

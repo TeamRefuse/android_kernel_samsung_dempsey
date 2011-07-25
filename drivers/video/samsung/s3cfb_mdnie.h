@@ -329,7 +329,22 @@
 #define SIG_MDNIE_VIDEO_COLD_MODE			3
 #define SIG_MDNIE_CAMERA_MODE				4
 #define SIG_MDNIE_NAVI						5
+#if defined(CONFIG_ARIES_LATONA)
+#define SIG_MDNIE_GALLERY					6
+#endif
 
+#if defined(CONFIG_ARIES_LATONA)
+typedef enum
+{
+	mDNIe_UI_MODE,
+	mDNIe_VIDEO_MODE,
+	mDNIe_VIDEO_WARM_MODE,
+	mDNIe_VIDEO_COLD_MODE,
+	mDNIe_CAMERA_MODE,
+	mDNIe_NAVI,
+	mDNIe_GALLERY,
+}Lcd_mDNIe_UI;
+#else
 typedef enum
 {
 	mDNIe_UI_MODE,
@@ -339,6 +354,7 @@ typedef enum
 	mDNIe_CAMERA_MODE,
 	mDNIe_NAVI
 }Lcd_mDNIe_UI;
+#endif
 
 int s3c_mdnie_init(void);
 int s3c_mdnie_enable(void);

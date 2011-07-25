@@ -568,7 +568,7 @@ dhd_preinit_ioctls(dhd_pub_t *dhd)
 	int arp_ol = 0xf;
 	int scan_assoc_time = 40;
 	int scan_unassoc_time = 80;
-	int assoc_retry = 3;
+	int assoc_retry = 7;
 	char buf[256];
 #ifdef AP
 	uint32 apsta = 1; /* Enable APSTA mode */
@@ -709,8 +709,7 @@ dhd_preinit_ioctls(dhd_pub_t *dhd)
 	ret = dhd_enable_keepalive(dhd, 60000); /* 60 sec */
 	if (ret) {
 		DHD_ERROR(("%s: Keepalive setting failure, error=%d\n", __FUNCTION__, ret));
-		/* For MFG Mode */
-		ret = 0;
+		ret = 0; // For MFG mode
 	}
 #endif
 

@@ -2,8 +2,8 @@
  *
  * CEC register header file for Samsung TVOut driver
  *
- * Copyright (c) 2009 Samsung Electronics
- * 	http://www.samsung.com/
+ * Copyright (c) 2010 Samsung Electronics
+ * http://www.samsung.com/
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -15,7 +15,6 @@
 
 #define HDMIDP_CECREG(x)    (x)
 
-//@{
 /**
  * @name CEC config/status registers
  */
@@ -30,9 +29,7 @@
 #define CEC_DIVISOR_1       HDMIDP_CECREG(0x0034)
 #define CEC_DIVISOR_2       HDMIDP_CECREG(0x0038)
 #define CEC_DIVISOR_3       HDMIDP_CECREG(0x003C)
-//@}
 
-//@{
 /**
  * @name CEC Tx related registers
  */
@@ -56,9 +53,7 @@
 #define CEC_TX_BUFF13       HDMIDP_CECREG(0x00B4)
 #define CEC_TX_BUFF14       HDMIDP_CECREG(0x00B8)
 #define CEC_TX_BUFF15       HDMIDP_CECREG(0x00BC)
-//@}
 
-//@{
 /**
  * @name CEC Rx related registers
  */
@@ -81,12 +76,10 @@
 #define CEC_RX_BUFF13       HDMIDP_CECREG(0x0134)
 #define CEC_RX_BUFF14       HDMIDP_CECREG(0x0138)
 #define CEC_RX_BUFF15       HDMIDP_CECREG(0x013C)
-//@}
 
 #define CEC_RX_FILTER_CTRL  HDMIDP_CECREG(0x0180)
 #define CEC_RX_FILTER_TH    HDMIDP_CECREG(0x0184)
 
-//@{
 /**
  * @name Bit values
  */
@@ -102,7 +95,6 @@
 
 #define CEC_RX_CTRL_ENABLE          (1<<0)
 #define CEC_RX_CTRL_RESET           (1<<7)
-//@}
 
 #define CEC_LOGIC_ADDR_MASK         0x0F
 

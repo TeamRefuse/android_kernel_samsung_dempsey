@@ -4,35 +4,17 @@ EXTRA_CFLAGS += -Dlinux -DLINUX -DBDC -DBCMDRIVER -DBCMDONGLEHOST -DDHDTHREAD -D
 
 ################ OPTIONAL FEATURES ############################################################
 #TO ENALBLE OPTIONAL FEATURES UNCOMMENT THE CORRESPONDING FLAGS
-
 # For Samsung Aries only.
 EXTRA_CFLAGS += -DCUSTOMER_HW_SAMSUNG
 
 # For MACID management
-ifeq ($(CONFIG_S5PC110_SIDEKICK_BOARD),y)
-EXTRA_CFLAGS += -DREAD_MACADDR
-endif
-
-ifeq ($(CONFIG_S5PC110_VIBRANTPLUS_BOARD),y)
-EXTRA_CFLAGS += -DWRITE_MACADDR
-endif
-
 ifeq ($(CONFIG_S5PC110_HAWK_BOARD),y)
 EXTRA_CFLAGS += -DREAD_MACADDR
-endif
-
-ifeq ($(CONFIG_S5PC110_T959_BOARD),y)
+else
 EXTRA_CFLAGS += -DWRITE_MACADDR
 endif
-
-# For 5G scan home channel time. (default=45 -> 60)
-#EXTRA_CFLAGS += -DSCAN_5G_HOMECHANNEL_TIME
-
-#GAN-Lite rove in issue
-#EXTRA_CFLAGS += -DROAM_TEST_CODE
-
 # For AUTH time patch
-EXTRA_CFLAGS += -DAUTH_TIME_PATCH
+# EXTRA_CFLAGS += -DAUTH_TIME_PATCH
 
 # Check if this is required. SDIO_ISR_THREAD is mutually exclusive with OOB_INTR_ONLY
 #EXTRA_CFLAGS += -DSDIO_ISR_THREAD
@@ -65,13 +47,28 @@ EXTRA_CFLAGS += -DPKT_FILTER_SUPPORT
 #Disable PowerSave mode for OTA or certification test
 #EXTRA_CFLAGS += -DBCMDISABLE_PM
 
-###############################################################################################
+# Trigger first broadscan in driver
+EXTRA_CFLAGS += -DCONFIG_FIRST_SCAN
 
-ifeq ($(CONFIG_BCM_EMBED_FW),y)
-	EXTRA_CFLAGS		+= -I$(src)/src/dongle/rte/wl/builds/4325b0/sdio-g-cdc-reclaim-wme/
-	EXTRA_CFLAGS		+= -DBCMEMBEDIMAGE
-	EXTRA_CFLAGS		+= -DIMAGE_NAME="4325b0/sdio-g-cdc-reclaim-wme"
-endif
+# COMBO SCAN
+EXTRA_CFLAGS += -DCSCAN
+
+# For CCKM support
+EXTRA_CFLAGS += -DBCMCCX
+
+# For Debug
+#EXTRA_CFLAGS += -DBCMDBG_EVENT
+
+# FW Debug Trace
+#EXTRA_CFLAGS += -DUSE_FW_TRACE
+
+# OKC
+EXTRA_CFLAGS += -DUSE_OKC
+
+# Keep Alive
+EXTRA_CFLAGS += -DUSE_KEEP_ALIVE
+
+###############################################################################################
 
 EXTRA_CFLAGS += -I$(src)/src/include/
 EXTRA_CFLAGS += -I$(src)/src/dhd/sys/
@@ -80,10 +77,10 @@ EXTRA_CFLAGS += -I$(src)/src/bcmsdio/sys/
 EXTRA_CFLAGS += -I$(src)/src/wl/sys/
 EXTRA_CFLAGS += -I$(src)/src/shared/
 
+EXTRA_LDFLAGS += --strip-debug
+
 KBUILD_CFLAGS += -I$(LINUXDIR)/include -I$(shell pwd)
 
-
-#obj-$(CONFIG_BROADCOM_WIFI)-m	+= dhd.o
 obj-m	+= dhd.o
 
 dhd-y := src/dhd/sys/dhd_linux.o \
@@ -92,6 +89,7 @@ dhd-y := src/dhd/sys/dhd_linux.o \
          src/dhd/sys/dhd_linux_sched.o\
          src/dhd/sys/dhd_sdio.o \
          src/dhd/sys/dhd_custom_gpio.o \
+         src/dhd/sys/dhd_custom_sec.o \
          src/shared/aiutils.o \
          src/shared/bcmutils.o \
          src/shared/bcmwifi.o \
@@ -110,13 +108,14 @@ all:
 		SUBDIRS=$(CURDIR) modules
 
 clean: 
-	rm -rf *.o *.ko *.mod.c *~ .*.cmd Module.symvers modules.order .tmp_versions	\
+	rm -rf *.o *.o.cmd *.ko *.mod.c *~ .*.cmd Module.symvers modules.order .tmp_versions	\
 	 	 src/dhd/sys/dhd_linux.o \
          src/dhd/sys/dhd_common.o \
          src/dhd/sys/dhd_cdc.o \
          src/dhd/sys/dhd_linux_sched.o\
          src/dhd/sys/dhd_sdio.o \
          src/dhd/sys/dhd_custom_gpio.o \
+         src/dhd/sys/dhd_custom_sec.o \
          src/shared/aiutils.o \
          src/shared/bcmutils.o \
          src/shared/bcmwifi.o \
@@ -128,7 +127,26 @@ clean:
          src/bcmsdio/sys/bcmsdh.o \
          src/bcmsdio/sys/bcmsdh_linux.o \
          src/bcmsdio/sys/bcmsdh_sdmmc_linux.o \
-         src/wl/sys/wl_iw.o 
+         src/wl/sys/wl_iw.o \
+ 	 src/dhd/sys/.dhd_linux.o.cmd \
+         src/dhd/sys/.dhd_common.o.cmd \
+         src/dhd/sys/.dhd_cdc.o.cmd \
+         src/dhd/sys/.dhd_linux_sched.o.cmd\
+         src/dhd/sys/.dhd_sdio.o.cmd \
+         src/dhd/sys/.dhd_custom_gpio.o.cmd \
+         src/dhd/sys/.dhd_custom_sec.o.cmd \
+         src/shared/.aiutils.o.cmd \
+         src/shared/.bcmutils.o.cmd \
+         src/shared/.bcmwifi.o.cmd \
+         src/shared/.hndpmu.o.cmd \
+         src/shared/.linux_osl.o.cmd \
+         src/shared/.sbutils.o.cmd \
+         src/shared/.siutils.o.cmd \
+         src/bcmsdio/sys/.bcmsdh_sdmmc.o.cmd \
+         src/bcmsdio/sys/.bcmsdh.o.cmd \
+         src/bcmsdio/sys/.bcmsdh_linux.o.cmd \
+         src/bcmsdio/sys/.bcmsdh_sdmmc_linux.o.cmd \
+         src/wl/sys/.wl_iw.o.cmd
 
 install:
 	@$(MAKE) --no-print-directory -C $(KDIR) \

@@ -33,7 +33,9 @@ int audience_probe(void);
 int audience_bypass(u8 *p);
 int audience_closetalk(u8 *p);
 int audience_fartalk(u8 *p);
+#if defined(CONFIG_S5PC110_DEMPSEY_BOARD)
 int audience_eartalk(u8 *p);
+#endif
 int audience_NS0(u8 *p);
 int audience_state(void);
 int factory_sub_mic_status(void);
@@ -58,11 +60,11 @@ int closetalk_num=0;
 int fartalk_tunningdata[200]; // 0x200x
 enum AUDIENCEFLAGE fartalk_tunningdata_flag=AUDIENCE_NCHANGE;
 int fartalk_num=0;
-
+#if defined(CONFIG_S5PC110_DEMPSEY_BOARD)
 int eartalk_tunningdata[200]; // 0x200x
 enum AUDIENCEFLAGE eartalk_tunningdata_flag=AUDIENCE_NCHANGE;
 int eartalk_num=0;
-
+#endif
 int NS0_tunningdata[200]; // 0x300x
 enum AUDIENCEFLAGE NS0_tunningdata_flag=AUDIENCE_NCHANGE;
 int NS0_num=0;
@@ -178,6 +180,7 @@ static int audience_write(struct file *filp, const char *buf, size_t count, loff
 		printk("NS0 flag=%d, num=%d\n",NS0_tunningdata_flag,NS0_num);
 #endif
 	}
+#if defined(CONFIG_S5PC110_DEMPSEY_BOARD)	
 	else
 	{
 		memset(eartalk_tunningdata,0,sizeof(eartalk_tunningdata));
@@ -192,6 +195,7 @@ static int audience_write(struct file *filp, const char *buf, size_t count, loff
 		printk("eartalk flag=%d, num=%d\n",eartalk_tunningdata_flag,eartalk_num);
 #endif
 	}
+#endif
 	return 0;
 }
 
@@ -264,7 +268,7 @@ int audience_fartalk(u8 *p)
 	return idx*2;	
 
 }
-
+#if defined(CONFIG_S5PC110_DEMPSEY_BOARD)
 int audience_eartalk(u8 *p)
 {
 	audiencedebug("");
@@ -289,7 +293,7 @@ int audience_eartalk(u8 *p)
 	return idx*2;	
 
 }
-
+#endif
 int audience_NS0(u8 *p)
 {
 	audiencedebug("");

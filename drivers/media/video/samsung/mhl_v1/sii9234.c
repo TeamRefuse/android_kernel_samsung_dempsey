@@ -41,17 +41,10 @@
 #include <linux/syscalls.h> 
 #include <linux/fcntl.h> 
 #include <asm/uaccess.h> 
-#include <mach/max8998_function.h>
-
-
-
-#include <linux/regulator/max8998.h>
-#include <linux/regulator/max8893.h>
-
-
-
+#include <linux/slab.h>
 #include "sii9234_driver.h"
-
+#include "Common_Def.h"
+#include <linux/regulator/consumer.h>
 
 #define SUBJECT "MHL_DRIVER"
 
@@ -72,6 +65,12 @@ static int SII9234A_i2cprobe_status = 0;
 static int SII9234B_i2cprobe_status = 0;
 static int SII9234C_i2cprobe_status = 0;
 int SII9234_i2c_status = 0;
+
+
+
+static struct regulator *mhl_buck; 		//VSIL_1.2A & VSIL_1.2C Connected to MAX8893
+static struct regulator *mhl_ldo5;		//VCC_3.3V_MHL Connected to MAX8893
+static struct regulator *mhl_ldo4;	        //VCC_1.8V_MHL Connected to MAX8893
 EXPORT_SYMBOL(SII9234_i2c_status);
 
 struct work_struct SiI9234_int_work;
@@ -137,9 +136,9 @@ static ssize_t check_MHL_command(struct device *dev, struct device_attribute *at
 
 	printk(KERN_ERR "[MHL]: check_MHL_command\n");
 	sii9234_cfg_power(1);
-	s3c_gpio_setpin(GPIO_MHL_RST, 0);
+	gpio_set_value(GPIO_MHL_RST, 0);
 	msleep(200);
-	s3c_gpio_setpin(GPIO_MHL_RST, 1);
+	gpio_set_value(GPIO_MHL_RST, 1);
 	res = SiI9234_startTPI();
 	count = sprintf(buf,"%d\n", res );
 	sii9234_cfg_power(0);
@@ -200,7 +199,7 @@ static ssize_t MHD_check_read(struct device *dev, struct device_attribute *attr,
 
 	s3c_gpio_setpull(GPIO_MHL_SEL, S3C_GPIO_PULL_UP);	//MHL_SEL
 
-	s3c_gpio_setpin(GPIO_MHL_SEL, 1);
+	gpio_set_value(GPIO_MHL_SEL, 1);
 	
 
 	//TVout_LDO_ctrl(true);
@@ -246,7 +245,7 @@ static ssize_t MHD_check_read(struct device *dev, struct device_attribute *attr,
 		
 	s3c_gpio_setpull(GPIO_MHL_SEL, S3C_GPIO_PULL_NONE);	//MHL_SEL
 
-	s3c_gpio_setpin(GPIO_MHL_SEL, 0);
+	gpio_set_value(GPIO_MHL_SEL, 0);
 
 #endif
 	count = sprintf(buf,"%d\n", res );
@@ -630,55 +629,104 @@ struct i2c_driver SII9234C_i2c_driver = {
 	.command = NULL,
 };
 
+static int  sii9234_pre_cfg_power(void)
+{
+		int rc;
+		
+		mhl_buck = regulator_get(NULL, "mhl_1p2v");
+		if (IS_ERR(mhl_buck)) {
+			rc = PTR_ERR(mhl_buck);
+			pr_err("%s: l25 get failed (%d)\n", __func__, rc);
+			return rc;
+		}
+
+		mhl_ldo4 = regulator_get(NULL, "mhl_1p8v");
+		if (IS_ERR(mhl_ldo4)) {
+			rc = PTR_ERR(mhl_ldo4);
+			pr_err("%s: mvs0 get failed (%d)\n", __func__, rc);
+			return rc;
+		}
+		
+		mhl_ldo5 = regulator_get(NULL, "mhl_3p3v");
+		if (IS_ERR(mhl_ldo5)) {
+			rc = PTR_ERR(mhl_ldo5);
+			pr_err("%s: l2 get failed (%d)\n", __func__, rc);
+			return rc;
+		}	
+
+		return 0;
+
+}
+
 
 void sii9234_cfg_power(bool on)
 {
 
-	s3c_gpio_cfgpin(GPIO_HDMI_EN1,S3C_GPIO_OUTPUT);		//HDMI_EN1 for LDO3,4 and BUCK MAX8893	GPJ1(2)
+	int rc;
+        static bool sii_power_state = 0;
+	if (sii_power_state == on) //Rajucm: Avoid unbalanced voltage regulator onoff
+	{
+		printk("sii_power_state is already %s ", sii_power_state?"on":"off");
+		return;
+	}
+	sii_power_state = on;
+
+	s3c_gpio_cfgpin(GPIO_HDMI_EN1, S3C_GPIO_OUTPUT);
 
 	if(on)
 	{
-		s3c_gpio_setpin(GPIO_HDMI_EN1, 1);
-		//VCC_2.8V_PDA LDO9 MAX8987 already enabled
-		Set_MAX8998_PM_OUTPUT_Voltage(BUCK3, VCC_1p800);
-		Set_MAX8998_PM_REG(EN3, 1);	//Enable BUCK3	--> VCC_1.8V_PDA MAX8987
+		gpio_set_value(GPIO_HDMI_EN1, 1);
+		s3c_gpio_setpull(GPIO_HDMI_EN1, S3C_GPIO_PULL_UP);
+		rc = regulator_enable(mhl_buck);		//VSIL_1.2A & VSIL_1.2C 	
+		if (rc) {
+			pr_err("%s: mhl_buck vreg enable failed (%d)\n", __func__, rc);
+			printk("regulator_get_voltage() mhl_buck %d", regulator_get_voltage(mhl_buck));
+			return;
+		}
 
+		rc = regulator_enable(mhl_ldo4);		//VCC_1.8V_MHL
+		if (rc) {
+			pr_err("%s: mhl_ldo4 vreg enable failed (%d)\n", __func__, rc);
+			printk("regulator_get_voltage() mhl_buck %d", regulator_get_voltage(mhl_ldo4));
+			return;
+		}
+		
+		rc = regulator_enable(mhl_ldo5);		//VCC_3.3V_MHL
+		if (rc) {
+			pr_err("%s: mhl_ldo5 vreg enable failed (%d)\n", __func__, rc);
+			printk("regulator_get_voltage() mhl_buck %d", regulator_get_voltage(mhl_ldo5));
+			return;
+		}
 
-		max8893_ldo_enable_direct(MAX8893_BUCK);//VSIL_1.2A	Turn on LX BUCK MAX8893 and also VSIL_1.2C
-
-
-		max8893_ldo_enable_direct(MAX8893_LDO4);//VCC_1.8V_MHL LD04 MAX8893	Turn on
-		max8893_ldo_enable_direct(MAX8893_LDO5);//VCC_3.3V_MHL	LDO5 MAX8893	Turn on
-
-
-		s3c_gpio_cfgpin(GPIO_MHL_RST,S3C_GPIO_OUTPUT);		//MHL_RST	MP0(4)
-		s3c_gpio_setpull(GPIO_MHL_RST, S3C_GPIO_PULL_NONE);
-	
-
-		s3c_gpio_setpull(GPIO_AP_SCL, S3C_GPIO_PULL_DOWN); //NAGSM_Android_SEL_Kernel_Aakash_20101214
-
-		#if 0 
-		s3c_gpio_setpin(GPIO_MHL_RST, 0);
-		//mdelay(200);
-		msleep(200);
-		s3c_gpio_setpin(GPIO_MHL_RST, 1);
-		#endif
-		s3c_gpio_setpull(GPIO_AP_SCL, S3C_GPIO_PULL_NONE); //NAGSM_Android_SEL_Kernel_Aakash_20101214
-
+		printk("sii9234_cfg_power on\n");
 	}
-
-	else 
+	else
 	{
 
-		max8893_ldo_disable_direct(MAX8893_BUCK);//VSIL_1.2A	Turn off LX BUCK MAX8893 and also VSIL_1.2C
+		rc = regulator_disable(mhl_buck);		//VSIL_1.2A & VSIL_1.2C 	
+		if (rc) {
+			pr_err("%s: mhl_buck vreg enable failed (%d)\n", __func__, rc);
+			return;
+		}
 
+		rc = regulator_disable(mhl_ldo4);		//VCC_1.8V_MHL
+		if (rc) {
+			pr_err("%s: mhl_ldo4 vreg enable failed (%d)\n", __func__, rc);
+			return;
+		}
+		
+		rc = regulator_disable(mhl_ldo5);		//VCC_3.3V_MHL
+		if (rc) {
+			pr_err("%s: mhl_ldo4 vreg enable failed (%d)\n", __func__, rc);
+			return;
+		}
 
-		max8893_ldo_disable_direct(MAX8893_LDO4);//VCC_1.8V_MHL LD04 MAX8893	Turn off
-		max8893_ldo_disable_direct(MAX8893_LDO5);//VCC_3.3V_MHL	LDO5 MAX8893	Turn off
+                gpio_set_value(GPIO_HDMI_EN1, 0);
+		s3c_gpio_setpull(GPIO_HDMI_EN1, S3C_GPIO_PULL_DOWN);
 
-		s3c_gpio_setpin(GPIO_HDMI_EN1, 0);
-
+		printk("sii9234_cfg_power off\n");
 	}
+	return;
 
 }
 
@@ -717,8 +765,7 @@ static void sii9234_cfg_gpio()
 	s3c_gpio_cfgpin(GPIO_MHL_SEL,S3C_GPIO_OUTPUT);
 	s3c_gpio_setpull(GPIO_MHL_SEL, S3C_GPIO_PULL_NONE);	//MHL_SEL
 
-	s3c_gpio_setpin(GPIO_MHL_SEL, 0);
-	
+	gpio_set_value(GPIO_MHL_SEL, 0);
 
 }
 
@@ -779,6 +826,7 @@ static int __init sii9234_init(void)
 {
 	int ret;
 
+        sii9234_pre_cfg_power();
 	sii9234_cfg_gpio();
 	/* sii9234_cfg_power(1);	//Turn On power to SiI9234 
 	*/

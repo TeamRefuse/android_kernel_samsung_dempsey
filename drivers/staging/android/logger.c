@@ -23,6 +23,7 @@
 #include <linux/miscdevice.h>
 #include <linux/uaccess.h>
 #include <linux/poll.h>
+#include <linux/slab.h>
 #include <linux/time.h>
 #include "logger.h"
 
@@ -55,17 +56,22 @@ static struct struct_plat_log_mark plat_log_mark =  {
 };
 
 struct struct_marks_ver_mark {
-  u32 special_mark_1;
-  u32 special_mark_2;
-  u32 special_mark_3;
-  u32 special_mark_4;
-  u32 log_mark_version;
-  u32 framebuffer_mark_version;
-  void * this;                   /* 2개의 메모리를 구별하기 위해서 사용됩니다.*/
-  u32 first_size;                /* first memory block의  size */
-  u32 first_start_addr;          /* first memory  block의 Physical address */
-  u32 second_size;               /* second memory block의  size */
-  u32 second_start_addr;         /* second memory  block의 Physical address */
+	u32 special_mark_1;
+	u32 special_mark_2;
+	u32 special_mark_3;
+	u32 special_mark_4;
+	u32 log_mark_version;
+	u32 framebuffer_mark_version;
+	/* 2ê°ì ë©ëª¨ë¦¬ë¥¼ êµ¬ë³íê¸° ìí´ì ì¬ì©ë©ëë¤.*/
+	void * this;
+	/* first memory blockì  size */
+	u32 first_size;
+	/* first memory  blockì Physical address */
+	u32 first_start_addr;
+	/* second memory blockì  size */
+	u32 second_size;
+	/* second memory  blockì Physical address */
+	u32 second_start_addr;
 };
 
 static struct struct_marks_ver_mark marks_ver_mark = {
@@ -75,11 +81,11 @@ static struct struct_marks_ver_mark marks_ver_mark = {
 	.special_mark_4 = (('v' << 24) | ('e' << 16) | ('r' << 8) | ('s' << 0)),
 	.log_mark_version = 1,
 	.framebuffer_mark_version = 1,
-	.this=&marks_ver_mark,
-	.first_size=128*1024*1024,
-	.first_start_addr=0x30000000,
-	.second_size=256*1024*1024,
-	.second_start_addr=0x40000000
+	.this = &marks_ver_mark,
+	.first_size = 128 * 1024 * 1024,
+	.first_start_addr = 0x30000000,
+	.second_size = 256 * 1024 * 1024,
+	.second_start_addr = 0x40000000
 };
 
 static char klog_buf[256];
@@ -366,20 +372,19 @@ static ssize_t do_write_log_from_user(struct logger_log *log,
 		if (copy_from_user(log->buffer, buf + len, count - len))
 			return -EFAULT;
 
-#if 1
-/* [LINUSYS] added by khoonk for calculating boot-time  on 20070508  */
-	memset(klog_buf,0,255);
-
-	if(strncmp(log->buffer  + log->w_off,  "!@", 2) == 0) {
-		if (count < 255)
-			memcpy(klog_buf,log->buffer  + log->w_off, count);			
-		else
-			memcpy(klog_buf,log->buffer  + log->w_off, 255);			
-
-		klog_buf[255]=0;
-}
-/* [LINUSYS] added by khoonk for calculating boot-time  on 20070508  */
-#endif	
+	/* print as kernel log if the log string starts with "!@" */
+	if (count >= 2) {
+		if (log->buffer[log->w_off] == '!'
+		    && log->buffer[logger_offset(log->w_off + 1)] == '@') {
+			char tmp[256];
+			int i;
+			for (i = 0; i < min(count, sizeof(tmp) - 1); i++)
+				tmp[i] =
+				    log->buffer[logger_offset(log->w_off + i)];
+			tmp[i] = '\0';
+			printk("%s\n", tmp);
+		}
+	}
 
 	log->w_off = logger_offset(log->w_off + count);
 
@@ -448,15 +453,6 @@ ssize_t logger_aio_write(struct kiocb *iocb, const struct iovec *iov,
 	/* wake up any blocked readers */
 	wake_up_interruptible(&log->wq);
 
-#if 1
-/* [LINUSYS] added by khoonk for calculating boot-time  on 20070508  */
-    if(strncmp(klog_buf, "!@", 2) == 0)
-	{
-		printk("%s\n",klog_buf);
-	}		
-/* [LINUSYS] added by khoonk for calculating boot-time  on 20070508  */
-#endif	
-	
 	return ret;
 }
 
@@ -634,10 +630,10 @@ static struct logger_log VAR = { \
 	.size = SIZE, \
 };
 
-DEFINE_LOGGER_DEVICE(log_main,   LOGGER_LOG_MAIN,   512*1024)
+DEFINE_LOGGER_DEVICE(log_main, LOGGER_LOG_MAIN, 512*1024)
 DEFINE_LOGGER_DEVICE(log_events, LOGGER_LOG_EVENTS, 256*1024)
-DEFINE_LOGGER_DEVICE(log_radio,  LOGGER_LOG_RADIO,  256*1024)
-DEFINE_LOGGER_DEVICE(log_system, LOGGER_LOG_SYSTEM,  64*1024)
+DEFINE_LOGGER_DEVICE(log_radio, LOGGER_LOG_RADIO, 256*1024)
+DEFINE_LOGGER_DEVICE(log_system, LOGGER_LOG_SYSTEM, 256*1024)
 
 static struct logger_log *get_log_from_minor(int minor)
 {

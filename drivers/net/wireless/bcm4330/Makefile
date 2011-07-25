@@ -49,7 +49,7 @@ EXTRA_CFLAGS += -DDHD_USE_STATIC_BUF
 EXTRA_CFLAGS += -DWLBTAMP
 
 # COMBO SCAN
-#EXTRA_CFLAGS += -DCSCAN
+EXTRA_CFLAGS += -DCSCAN
 
 # For Keepalive
 EXTRA_CFLAGS += -DUSE_KEEP_ALIVE
@@ -71,6 +71,9 @@ EXTRA_CFLAGS += -DUSE_CID_CHECK
 
 # 2.4G only scan for the initial broad scan
 #EXTRA_CFLAGS += -DUSE_INITIAL_2G_SCAN
+
+#Change PM mode dynamically
+EXTRA_CFLAGS += -DCONFIG_CONTROL_PM
 
 ###############################################################################################
 

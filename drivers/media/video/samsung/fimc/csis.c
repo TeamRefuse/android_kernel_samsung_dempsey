@@ -1,7 +1,7 @@
 /* linux/drivers/media/video/samsung/csis.c
  *
  * Copyright (c) 2010 Samsung Electronics Co,. Ltd.
- * 		http://www.samsung.com/
+ *		http://www.samsung.com/
  *
  * MIPI-CSI2 Support file for FIMC driver
  *
@@ -18,14 +18,15 @@
 #include <linux/irq.h>
 #include <linux/interrupt.h>
 #include <linux/platform_device.h>
+#include <linux/regulator/consumer.h>
 #include <linux/videodev2.h>
+#include <linux/slab.h>
 
 #include <linux/io.h>
 #include <linux/memory.h>
 #include <plat/clock.h>
 #include <plat/regs-csis.h>
 #include <plat/csis.h>
-#include <mach/pd.h>
 #include "csis.h"
 
 static struct s3c_csis_info *s3c_csis;
@@ -209,9 +210,16 @@ static void s3c_csis_set_hs_settle(int settle)
 }
 #endif
 
-void s3c_csis_start(int lanes, int settle, int align, int width, int height, int pixel_format)
+void s3c_csis_start(int lanes, int settle, int align, int width,
+		int height, int pixel_format)
 {
 	struct s3c_platform_csis *pdata;
+
+	if (s3c_csis->initialized)
+		return;
+
+	printk(KERN_INFO "%s: width %d, height %d pixel format %d\n",
+			__func__, width, height, pixel_format);
 
 	pdata = to_csis_plat(s3c_csis->dev);
 	if (pdata->cfg_phy_global)
@@ -225,7 +233,7 @@ void s3c_csis_start(int lanes, int settle, int align, int width, int height, int
 	s3c_csis_set_hs_settle(settle);	/* s5k6aa */
 	s3c_csis_set_data_align(align);
 	s3c_csis_set_wclk(0);
-	if (pixel_format == V4L2_PIX_FMT_JPEG) 
+	if (pixel_format == V4L2_PIX_FMT_JPEG)
 		s3c_csis_set_format(MIPI_USER_DEF_PACKET_1);
 	else
 		s3c_csis_set_format(MIPI_CSI_YCBCR422_8BIT);
@@ -237,20 +245,29 @@ void s3c_csis_start(int lanes, int settle, int align, int width, int height, int
 	s3c_csis_system_on();
 	s3c_csis_phy_on();
 
+	s3c_csis->initialized = 1;
+
 	info("Samsung MIPI-CSI2 operation started\n");
 }
 
-static void s3c_csis_stop(struct platform_device *pdev)
+void s3c_csis_stop()
 {
 	struct s3c_platform_csis *plat;
+
+	if (!s3c_csis->initialized)
+		return;
+
+	printk(KERN_INFO "%s\n", __func__);
 
 	s3c_csis_disable_interrupt();
 	s3c_csis_system_off();
 	s3c_csis_phy_off();
 
-	plat = to_csis_plat(&pdev->dev);
+	plat = to_csis_plat(s3c_csis->dev);
 	if (plat->cfg_phy_global)
 		plat->cfg_phy_global(0);
+
+	s3c_csis->initialized = 0;
 }
 
 static irqreturn_t s3c_csis_irq(int irq, void *dev_id)
@@ -259,6 +276,7 @@ static irqreturn_t s3c_csis_irq(int irq, void *dev_id)
 
 	/* just clearing the pends */
 	cfg = readl(s3c_csis->regs + S3C_CSIS_INTSRC);
+	printk(KERN_ERR "MIPI IRQ : 0x%08x\n", cfg);//bestiq	
 	writel(cfg, s3c_csis->regs + S3C_CSIS_INTSRC);
 
 	return IRQ_HANDLED;
@@ -267,38 +285,18 @@ static irqreturn_t s3c_csis_irq(int irq, void *dev_id)
 static int s3c_csis_clk_on(struct platform_device *pdev)
 {
 	struct s3c_platform_csis *pdata;
-	struct clk *parent, *mout_csis;
-	int ret;
-
-	/* power domain enable for mipi-csis */
-	ret = s5pv210_pd_enable("csis_pd");
-	if (ret < 0) {
-		err("failed to enable csis power domain\n");
-		return -EINVAL;
-	}
 
 	pdata = to_csis_plat(&pdev->dev);
 
-	/* mout_mpll */
-	parent = clk_get(&pdev->dev, pdata->srclk_name);
-	if (IS_ERR(parent)) {
-		err("failed to get parent clock for csis\n");
-		return -EINVAL;
-	}
-
-	/* mout_csis */
-	mout_csis = clk_get(&pdev->dev, "mout_csis");
-
-	/* sclk_csis */
-	s3c_csis->clock = clk_get(&pdev->dev, pdata->clk_name);
+	/* get csis IP clock(CLK_CSIS) */
+	s3c_csis->clock = clk_get(&pdev->dev, "csis");
 	if (IS_ERR(s3c_csis->clock)) {
-		err("failed to get csis clock source\n");
+		err("failed to get csis ip clock\n");
 		return -EINVAL;
 	}
 
-	clk_set_parent(mout_csis, parent);
-	clk_set_parent(s3c_csis->clock, mout_csis);
-
+	/* Turn on csis power domain regulator */
+	regulator_enable(s3c_csis->regulator);
 	/* clock enable for csis */
 	clk_enable(s3c_csis->clock);
 
@@ -308,26 +306,20 @@ static int s3c_csis_clk_on(struct platform_device *pdev)
 static int s3c_csis_clk_off(struct platform_device *pdev)
 {
 	struct s3c_platform_csis *plat;
-	int ret;
 
 	plat = to_csis_plat(&pdev->dev);
 
-	/* sclk_csis */
-	s3c_csis->clock = clk_get(&pdev->dev, plat->clk_name);
+	/* get csis IP clock(CLK_CSIS) */
+	s3c_csis->clock = clk_get(&pdev->dev, "csis");
 	if (IS_ERR(s3c_csis->clock)) {
-		err("failed to get csis clock source\n");
+		err("failed to get csis ip clock\n");
 		return -EINVAL;
 	}
 
 	/* clock disable for csis */
 	clk_disable(s3c_csis->clock);
-
-	/* power domain disable for mipi-csis */
-	ret = s5pv210_pd_disable("csis_pd");
-	if (ret < 0) {
-		err("failed to enable csis power domain\n");
-		return -EINVAL;
-	}
+	/* Turn off csis power domain regulator */
+	regulator_disable(s3c_csis->regulator);
 
 	return 0;
 }
@@ -335,6 +327,8 @@ static int s3c_csis_clk_off(struct platform_device *pdev)
 static int s3c_csis_probe(struct platform_device *pdev)
 {
 	struct s3c_platform_csis *pdata;
+	struct clk *sclk_csis = NULL;
+	struct clk *parent = NULL;
 	struct resource *res;
 
 	s3c_csis_set_info();
@@ -344,6 +338,31 @@ static int s3c_csis_probe(struct platform_device *pdev)
 	pdata = to_csis_plat(&pdev->dev);
 	if (pdata->cfg_gpio)
 		pdata->cfg_gpio();
+
+	/* Get csis power domain regulator */
+	s3c_csis->regulator = regulator_get(&pdev->dev, "pd");
+	if (IS_ERR(s3c_csis->regulator)) {
+		err("%s: failed to get resource %s\n",
+				__func__, "s3c-csis");
+		return PTR_ERR(s3c_csis->regulator);
+	}
+
+	/* get parent clock for sclk_csis */
+	parent = clk_get(&pdev->dev, pdata->srclk_name);
+	if (IS_ERR(parent)) {
+	        err("failed to get parent clock for sclk_csis\n");
+	        return -EINVAL;
+	}
+
+	/* get special clock for mipi-csis */
+	sclk_csis = clk_get(&pdev->dev, pdata->clk_name);
+	if (IS_ERR(sclk_csis)) {
+	        err("failed to get sclk_csis(%s) clock source\n",
+	                pdata->clk_name);
+	        return -EINVAL;
+	}
+	clk_set_parent(sclk_csis, parent);
+	clk_enable(sclk_csis);
 
 	/* clock & power on */
 	s3c_csis_clk_on(pdev);
@@ -373,6 +392,8 @@ static int s3c_csis_probe(struct platform_device *pdev)
 	if (request_irq(s3c_csis->irq, s3c_csis_irq, IRQF_DISABLED, \
 		s3c_csis->name, s3c_csis))
 		err("request_irq failed\n");
+
+	s3c_csis->initialized = 0;
 
 	info("Samsung MIPI-CSI2 driver probed successfully\n");
 

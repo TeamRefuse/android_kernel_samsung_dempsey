@@ -302,7 +302,9 @@ static int __init ram_console_init(struct ram_console_buffer *buffer,
 
 	register_console(&ram_console);
 #ifdef CONFIG_ANDROID_RAM_CONSOLE_ENABLE_VERBOSE
+#if  ! defined (CONFIG_S5PC110_HAWK_BOARD)
 	console_verbose();
+#endif
 #endif
 	return 0;
 }

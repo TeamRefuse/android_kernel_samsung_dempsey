@@ -1,0 +1,9 @@
+kernel/sound/soc/s3c24xx/snd-soc-s3c24xx.ko
+kernel/sound/soc/s3c24xx/snd-soc-s3c-idma.ko
+kernel/sound/soc/s3c24xx/snd-soc-s3c-dma-wrapper.ko
+kernel/sound/soc/s3c24xx/snd-soc-s5pc1xx-i2s.ko
+kernel/sound/soc/s3c24xx/snd-soc-s5p-i2s_sec.ko
+kernel/sound/soc/s3c24xx/snd-soc-s3c-i2s-v2.ko
+kernel/sound/soc/s3c24xx/snd-soc-s3c-pcmdev.ko
+kernel/sound/soc/s3c24xx/snd-soc-aries-wm8994.ko
+kernel/sound/soc/s3c24xx/snd-soc-s5pc1xx-pcm-wm8994.ko

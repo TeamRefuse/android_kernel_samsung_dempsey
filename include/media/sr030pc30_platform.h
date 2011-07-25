@@ -15,6 +15,7 @@ struct SR030pc30_platform_data {
 
 	/* This SoC supports Parallel & CSI-2 */
 	int is_mipi;
+	int (*power_en) (int);
 };
 
 //#define CAMERA_GPIO_I2C //NAGSM_Android_HQ_Camera_SungkooLee_20100914 0.0 board used I2C by GPIO

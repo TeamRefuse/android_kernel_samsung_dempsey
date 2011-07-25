@@ -1303,7 +1303,9 @@ int vt_ioctl(struct tty_struct *tty, struct file * file,
 		if (!perm)
 			goto eperm;
 		ret = copy_from_user(&ui, up, sizeof(struct unimapinit));
-		if (!ret)
+		if (ret)
+			ret = -EFAULT;
+		else
 			con_clear_unimap(vc, &ui);
 		break;
 	      }
@@ -1727,9 +1729,11 @@ void change_console(struct vc_data *new_vc)
 }
 
 /* Perform a kernel triggered VT switch for suspend/resume */
-
+#if defined (CONFIG_S5PC110_HAWK_BOARD) || defined (CONFIG_S5PC110_KEPLER_BOARD)
+static int disable_vt_switch = 1;
+#else
 static int disable_vt_switch;
-
+#endif
 int vt_move_to_console(unsigned int vt, int alloc)
 {
 	int prev;

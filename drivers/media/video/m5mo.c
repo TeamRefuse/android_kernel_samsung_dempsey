@@ -27,7 +27,7 @@
 #define M5MO_DRIVER_NAME		"M5MO"
 
 #define M5MO_FSI_FW_PATH			"/system/firmware/FSI/RS_M5LS.bin"
-#define M5MO_BSI_FW_PATH			"/system/firmware/BSI/RS_M5LS.bin"
+#define M5MO_BSI_FW_PATH			"/system/firmware/RS_M5LS.bin"
 
 #define SDCARD_FW
 #ifdef SDCARD_FW
@@ -390,7 +390,7 @@ static int m5mo_mem_read(struct i2c_client *c, u16 len, u32 addr, u8 *val)
 	return err;
 }
 
-static int m5mo_mem_write(struct i2c_client *c, u16 len, u32 addr, u8 *val)
+static int m5mo_mem_write(struct i2c_client *c, u8 cmd, u16 len, u32 addr, u8 *val)
 {
 	struct i2c_msg msg;
 	unsigned char data[len + 8];
@@ -406,7 +406,7 @@ static int m5mo_mem_write(struct i2c_client *c, u16 len, u32 addr, u8 *val)
 
 	/* high byte goes out first */
 	data[0] = 0x00;
-	data[1] = 0x04;
+	data[1] = cmd;
 	data[2] = (addr >> 24) & 0xFF;
 	data[3] = (addr >> 16) & 0xFF;
 	data[4] = (addr >> 8) & 0xFF;
@@ -414,6 +414,8 @@ static int m5mo_mem_write(struct i2c_client *c, u16 len, u32 addr, u8 *val)
 	data[6] = (len >> 8) & 0xFF;
 	data[7] = len & 0xFF;
 	memcpy(data + 2 + sizeof(addr) + sizeof(len), val, len);
+
+	cam_dbg("address %#x, length %d\n", addr, len);
 
 	for(i = M5MO_I2C_RETRY; i; i--) {
 		err = i2c_transfer(c->adapter, &msg, 1);
@@ -861,12 +863,35 @@ static int m5mo_get_af_status(struct v4l2_subdev *sd,
 {
 	struct i2c_client *client = v4l2_get_subdevdata(sd);
 	u32 val = 0;
-	int err;
+	int i, status, err;
 
-	err = m5mo_readb(client, M5MO_CATEGORY_LENS, M5MO_LENS_AF_STATUS, &val);
-	CHECK_ERR(err);
+	cam_dbg("E, value %d\n", val);
 	
-	ctrl->value = val;
+	err = -EBUSY;
+	for (i = 600; i && err; i--) {
+		msleep(10);
+		err = m5mo_readb(client, M5MO_CATEGORY_LENS, M5MO_LENS_AF_STATUS, &status);
+		CHECK_ERR(err);
+
+		if (!(status & 0x01))
+			err = 0;
+	}
+
+        switch(status) {
+        case 0x02:
+	     ctrl->value = AUTO_FOCUS_DONE;
+            break;
+
+        case 0x04:
+	     ctrl->value = AUTO_FOCUS_CANCELLED;
+            break;
+
+        default:
+	     ctrl->value = AUTO_FOCUS_FAILED;
+            break;
+        }		
+
+	cam_dbg("X\n");
 
 	return 0;
 }
@@ -1185,7 +1210,7 @@ static int m5mo_get_sensor_fw_version(struct v4l2_subdev *sd,
 	#else
 	/* set pin */
 	val = 0x7E;
-	err = m5mo_mem_write(client, sizeof(val), 0x50000308, &val);
+	err = m5mo_mem_write(client, 0x04, sizeof(val), 0x50000308, &val);
 	CHECK_ERR(err);
 
 	err = m5mo_mem_read(client, M5MO_FW_VER_LEN,
@@ -1288,6 +1313,7 @@ static int m5mo_get_phone_fw_version(struct v4l2_subdev *sd, char *str)
 
 static int m5mo_g_ext_ctrl(struct v4l2_subdev *sd, struct v4l2_ext_control *ctrl)
 {
+	struct m5mo_state *state = to_state(sd);
 	int err = 0;
 
 	switch (ctrl->id) {
@@ -1297,6 +1323,10 @@ static int m5mo_g_ext_ctrl(struct v4l2_subdev *sd, struct v4l2_ext_control *ctrl
 
 	case V4L2_CID_CAM_PHONE_FW_VER:
 		err = m5mo_get_phone_fw_version(sd, ctrl->string);
+		break;
+
+	case V4L2_CID_CAMERA_EXIF_FW_VER:
+		strcpy(ctrl->string, state->exif.unique_id);
 		break;
 		
 	default:
@@ -1891,8 +1921,8 @@ retry:
 		mode = 0x02;
 		break;
 		
-	case FOCUS_MODE_FD:
-	case FOCUS_MODE_FD_DEFAULT:
+	case FOCUS_MODE_FACEDETECT:
+	case FOCUS_MODE_FACEDETECT_DEFAULT:
 		mode = 0x03; 
 		break;
 
@@ -2667,12 +2697,45 @@ static int m5mo_s_ctrl(struct v4l2_subdev *sd, struct v4l2_control *ctrl)
 	return err;
 }
 
-static int 
-m5mo_program_fw(struct i2c_client *c, u8 *buf, u32 addr, u32 unit, u32 count)
+static int m5mo_check_manufacturer_id(struct i2c_client *c)
+{
+	int i, err;
+	u8 id;
+	u32 addr[] = {0x1000AAAA, 0x10005554, 0x1000AAAA};
+	u8 val[3][2] = {
+		[0] = {0x00, 0xAA},
+		[1] = {0x00, 0x55},
+		[2] = {0x00, 0x90},
+	};
+	u8 reset[] = {0x00, 0xF0};
+
+	/* set manufacturer's ID read-mode */
+	for (i = 0; i < 3; i++) {
+		err = m5mo_mem_write(c, 0x06, 2, addr[i], val[i]);
+		CHECK_ERR(err);
+	}
+
+	/* read manufacturer's ID */
+	err = m5mo_mem_read(c, sizeof(id), 0x10000001, &id);
+	CHECK_ERR(err);
+
+	/* reset manufacturer's ID read-mode */
+	err = m5mo_mem_write(c, 0x06, sizeof(reset), 0x10000000, reset);
+	CHECK_ERR(err);
+
+	cam_info("%#x\n", id);
+
+	return id;
+}
+
+static int m5mo_program_fw(struct i2c_client *c, u8 *buf, u32 addr, u32 unit, u32 count, u8 id)
 {
 	u32 val;
 	u32 intram_unit = 0x1000;
 	int i, j, retries, err = 0;
+	int erase = 0x01;
+	if (unit == SZ_64K && id != 0x01)
+		erase = 0x04;
 
 	for (i = 0; i < count; i++) {
 		/* Set Flash ROM memory address */
@@ -2680,7 +2743,7 @@ m5mo_program_fw(struct i2c_client *c, u8 *buf, u32 addr, u32 unit, u32 count)
 		CHECK_ERR(err);
 
 		/* Erase FLASH ROM entire memory */
-		err = m5mo_writeb(c, M5MO_CATEGORY_FLASH, M5MO_FLASH_ERASE, 0x01);
+		err = m5mo_writeb(c, M5MO_CATEGORY_FLASH, M5MO_FLASH_ERASE, erase);
 		CHECK_ERR(err);
 		/* Response while sector-erase is operating */
 		retries = 0;
@@ -2688,7 +2751,7 @@ m5mo_program_fw(struct i2c_client *c, u8 *buf, u32 addr, u32 unit, u32 count)
 			mdelay(10);
 			err = m5mo_readb(c, M5MO_CATEGORY_FLASH, M5MO_FLASH_ERASE, &val);			
 			CHECK_ERR(err);
-		} while (val && retries++ < M5MO_I2C_VERIFY);
+		} while (val == erase && retries++ < M5MO_I2C_VERIFY);
 		
 		/* Set FLASH ROM programming size */
 		err = m5mo_writew(c, M5MO_CATEGORY_FLASH, M5MO_FLASH_BYTE, 
@@ -2705,8 +2768,7 @@ m5mo_program_fw(struct i2c_client *c, u8 *buf, u32 addr, u32 unit, u32 count)
 	
 		/* Send programmed firmware */
 		for (j = 0; j < unit; j += intram_unit) {
-			err = m5mo_mem_write(c, intram_unit, M5MO_INT_RAM_BASE_ADDR + j, 
-													buf + (i * unit) + j);
+			err = m5mo_mem_write(c, 0x04, intram_unit, M5MO_INT_RAM_BASE_ADDR + j, buf + (i * unit) + j);
 			CHECK_ERR(err);
 			mdelay(10);
 		}
@@ -2737,7 +2799,7 @@ m5mo_program_fw(struct i2c_client *c, u8 *buf, u32 addr, u32 unit, u32 count)
 static int m5mo_load_fw(struct v4l2_subdev *sd)
 {
 	struct i2c_client *client = v4l2_get_subdevdata(sd);
-	u8 *buf, val;
+	u8 *buf = NULL, val, id;
 	int err;
 
 	struct file *fp;
@@ -2788,15 +2850,28 @@ static int m5mo_load_fw(struct v4l2_subdev *sd)
 
 	/* set pin */
 	val = 0x7E;
-	err = m5mo_mem_write(client, sizeof(val), 0x50000308, &val);
+	err = m5mo_mem_write(client, 0x04, sizeof(val), 0x50000308, &val);
 	CHECK_ERR(err);
+
+	id = m5mo_check_manufacturer_id(client);
+	if (id < 0) {
+		cam_err("i2c falied, err %d\n", id);
+		return id;
+	}
+
 	/* select flash memory */
-	err = m5mo_writeb(client, M5MO_CATEGORY_FLASH, M5MO_FLASH_SEL, 0x01);
+	err = m5mo_writeb(client, M5MO_CATEGORY_FLASH, M5MO_FLASH_SEL, id == 0x01 ? 0x00 : 0x01);
 	CHECK_ERR(err);
+	
 	/* program FLSH ROM */
-	err = m5mo_program_fw(client, buf, M5MO_FLASH_BASE_ADDR, SZ_64K, 31);
+	err = m5mo_program_fw(client, buf, M5MO_FLASH_BASE_ADDR, SZ_64K, 31, id);
 	CHECK_ERR(err);
-	err = m5mo_program_fw(client, buf, M5MO_FLASH_BASE_ADDR + SZ_64K * 31, SZ_8K, 4);
+
+	if (id == 0x01) {
+		err = m5mo_program_fw(client, buf, M5MO_FLASH_BASE_ADDR + SZ_64K * 31, SZ_8K, 4, id);
+	} else {
+		err = m5mo_program_fw(client, buf, M5MO_FLASH_BASE_ADDR + SZ_64K * 31, SZ_4K, 8, id);
+	}
 	CHECK_ERR(err);
 	
 	cam_info("end\n");
@@ -2880,27 +2955,28 @@ static int m5mo_load_fw(struct v4l2_subdev *sd)
 
 
 
-static int m5mo_check_version(struct i2c_client *client)
+static int m5mo_check_version(struct v4l2_subdev *sd)
 {
+	struct m5mo_state *state = to_state(sd);
+	struct i2c_client *client = v4l2_get_subdevdata(sd);
 	u32 ver_chip, ver_param, ver_awb, val;
-	char ver_user[M5MO_FW_VER_LEN + 1];
 	int i;
 	
 	m5mo_readb(client, M5MO_CATEGORY_SYS, M5MO_SYS_PJT_CODE, &ver_chip);
 	m5mo_readw(client, M5MO_CATEGORY_SYS, M5MO_SYS_VER_PARAM, &ver_param);
 	m5mo_readw(client, M5MO_CATEGORY_SYS, M5MO_SYS_VER_AWB, &ver_awb);
 
-	for (i = 0; i < M5MO_FW_VER_LEN; i++) {
+	for (i = 0; i < 6; i++) {
 		m5mo_readb(client, M5MO_CATEGORY_SYS, M5MO_SYS_USER_VER, &val);
-		ver_user[i] = (char)val;
+		state->exif.unique_id[i] = (char)val;
 	}
-	ver_user[i] = '\0';
-
+	state->exif.unique_id[i] = '\0';
+	
 	cam_info("***********************************\n");
 	cam_info("Chip\tParam\tAWB\tUSER\n");
 	cam_info("-----------------------------------\n");
 	cam_info("%#02x\t%#04x\t%#04x\t%s\n",
-		ver_chip, ver_param, ver_awb, ver_user);
+		ver_chip, ver_param, ver_awb, state->exif.unique_id);
 	cam_info("***********************************\n");
 
 	return 0;
@@ -2977,7 +3053,7 @@ static int m5mo_init(struct v4l2_subdev *sd, u32 val)
 	}
 	
 	/* check up F/W version */
-	err = m5mo_check_version(client);
+	err = m5mo_check_version(sd);
 	CHECK_ERR(err);
 	
 	m5mo_init_param(sd);
@@ -3110,6 +3186,11 @@ static int m5mo_remove(struct i2c_client *client)
 {
 	struct v4l2_subdev *sd = i2c_get_clientdata(client);
 	struct m5mo_state *state = to_state(sd);
+
+	#if 0
+	if (m5mo_set_zero_step(sd) < 0)
+		cam_err("failed to set soft landing\n");
+	#endif
 	
 	state->initialized = 0;
 	

@@ -37,33 +37,33 @@ static DEFINE_MUTEX(spi_rd);
 static inline void lcd_cs_value(int level)
 {
 #ifdef CONFIG_S5PC110_DEMPSEY_BOARD
-	s3c_gpio_setpin(S5PV210_MP05(4), level);//GPIO_DISPLAY_CS
+	gpio_set_value(S5PV210_MP05(4), level);//GPIO_DISPLAY_CS
 #else
-	s3c_gpio_setpin(S5PV210_MP01(1), level);//GPIO_DISPLAY_CS
+	gpio_set_value(S5PV210_MP01(1), level);//GPIO_DISPLAY_CS
 #endif 
 }
 
 static inline void lcd_clk_value(int level)
 {
 #ifdef CONFIG_S5PC110_DEMPSEY_BOARD
-	s3c_gpio_setpin(S5PV210_GPC1(3), level);//GPIO_DISPLAY_CLK
+	gpio_set_value(S5PV210_GPC1(3), level);//GPIO_DISPLAY_CLK
 #else
-	s3c_gpio_setpin(S5PV210_GPC0(1), level);//GPIO_DISPLAY_CLK
+	gpio_set_value(S5PV210_GPC0(1), level);//GPIO_DISPLAY_CLK
 #endif 
 }
 
 static inline void lcd_si_value(int level)
 {
 #ifdef CONFIG_S5PC110_DEMPSEY_BOARD
-	s3c_gpio_setpin(S5PV210_GPC1(0), level);//GPIO_DISPLAY_DAT
+	gpio_set_value(S5PV210_GPC1(0), level);//GPIO_DISPLAY_DAT
 #else
-	s3c_gpio_setpin(S5PV210_MP01(0), level);//GPIO_DISPLAY_DAT
+	gpio_set_value(S5PV210_MP01(0), level);//GPIO_DISPLAY_DAT
 #endif 
 }
 
 static inline int get_lcd_si_value()
 {
-	return (s3c_gpio_getpin(GPIO_DISPLAY_SI)?1:0);
+	return (gpio_get_value(GPIO_DISPLAY_SI)?1:0);
 }
 
 

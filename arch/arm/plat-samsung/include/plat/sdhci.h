@@ -52,14 +52,15 @@ struct s3c_sdhci_platdata {
 	/* add to deal with EXT_IRQ as a card detect pin */
 	void            (*cfg_ext_cd) (void);
 	unsigned int    (*detect_ext_cd) (void);
-#if defined(CONFIG_S5PC110_DEMPSEY_BOARD)
-	void			(*translate_vdd)(struct platform_device *pdev, unsigned int vdd);
-#endif /* CONFIG_MACH_S5PC110_P1 */
 	unsigned int    ext_cd;
 
 	/* add to deal with GPIO as a card write protection pin */
 	void            (*cfg_wp) (void);
 	int             (*get_ro) (struct mmc_host *mmc);
+
+        /* add to deal with non-removable device */
+        int     built_in;
+
 };
 
 /**
@@ -70,6 +71,7 @@ struct s3c_sdhci_platdata {
  * The call will copy the platform data, so the board definitions can
  * make the structure itself __initdata.
  */
+extern void s3c_sdhci_set_platdata(void);
 extern void s3c_sdhci0_set_platdata(struct s3c_sdhci_platdata *pd);
 extern void s3c_sdhci1_set_platdata(struct s3c_sdhci_platdata *pd);
 extern void s3c_sdhci2_set_platdata(struct s3c_sdhci_platdata *pd);
@@ -184,8 +186,10 @@ static inline void s3c6410_default_sdhci2(void) { }
 #else
 static inline void s3c6410_default_sdhci0(void) { }
 static inline void s3c6410_default_sdhci1(void) { }
+static inline void s3c6410_default_sdhci2(void) { }
 static inline void s3c6400_default_sdhci0(void) { }
 static inline void s3c6400_default_sdhci1(void) { }
+static inline void s3c6400_default_sdhci2(void) { }
 
 #endif /* CONFIG_S3C64XX_SETUP_SDHCI */
 
@@ -239,6 +243,8 @@ static inline void s5pc100_default_sdhci1(void) { }
 static inline void s5pc100_default_sdhci2(void) { }
 #endif /* CONFIG_S5PC100_SETUP_SDHCI */
 
+
+/* S5PC110 SDHCI setup */
 #ifdef CONFIG_S5PV210_SETUP_SDHCI
 extern char *s5pv210_hsmmc_clksrcs[4];
 

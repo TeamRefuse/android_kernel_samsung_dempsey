@@ -101,8 +101,12 @@ static int fimc_check_pos(struct fimc_control *ctrl,
 static int fimc_change_fifo_position(struct fimc_control *ctrl,
 				     struct fimc_ctx *ctx) {
 	struct v4l2_rect fimd_rect;
-	struct s3cfb_user_window window;
+	struct fb_info *fbinfo;
+	struct s3cfb_window *win;
 	int ret = -1;
+
+	fbinfo = registered_fb[ctx->overlay.fb_id];
+	win = (struct s3cfb_window *)fbinfo->par;
 
 	memset(&fimd_rect, 0, sizeof(struct v4l2_rect));
 
@@ -113,12 +117,13 @@ static int fimc_change_fifo_position(struct fimc_control *ctrl,
 	}
 
 	/* Update WIN position */
-	window.x = fimd_rect.left;
-	window.y = fimd_rect.top;
-	ret = s3cfb_direct_ioctl(ctrl->id, S3CFB_WIN_POSITION,
-			(unsigned long)&window);
+	win->x = fimd_rect.left;
+	win->y = fimd_rect.top;
+
+	fbinfo->var.activate = FB_ACTIVATE_FORCE;
+	ret = fb_set_var(fbinfo, &fbinfo->var);
 	if (ret < 0) {
-		fimc_err("direct_ioctl(S3CFB_WIN_POSITION) fail\n");
+		fimc_err("fb_set_var fail (ret=%d)\n", ret);
 		return -EINVAL;
 	}
 
@@ -149,7 +154,7 @@ int fimc_s_fmt_vid_overlay(struct file *filp, void *fh, struct v4l2_format *f)
 			return ret;
 
 		ctx->win = f->fmt.win;
-		fimc_change_fifo_position(ctrl, ctx);
+		//fimc_change_fifo_position(ctrl, ctx);
 
 		break;
 	case FIMC_STREAMOFF:
@@ -273,7 +278,56 @@ int fimc_s_fbuf(struct file *filp, void *fh, struct v4l2_framebuffer *fb)
 
 		ctx->overlay.mode = FIMC_OVLY_NONE_SINGLE_BUF;
 	} else {
+		int i;
+		unsigned int bits_per_pixel = 0;
+		struct s3cfb_window *win = NULL;
+		ctx->overlay.fb_id = -1;
+
+		for (i = 0; i < num_registered_fb; i++) {
+			win = (struct s3cfb_window *)registered_fb[i]->par;
+			if (win->id == ctrl->id) {
+				ctx->overlay.fb_id = i;
+				bits_per_pixel = registered_fb[i]->var.bits_per_pixel;
+				fimc_info2("%s: overlay.fb_id = %d\n",
+						__func__, ctx->overlay.fb_id);
+				break;
+			}
+		}
+
+		if (-1 == ctx->overlay.fb_id) {
+			fimc_err("%s: fb[%d] is not registered. " \
+					"must be registered for overlay\n",
+					__func__, ctrl->id);
+			return -1;
+		}
+
+		if (1 == win->enabled) {
+			fimc_err("%s: fb[%d] is already being used. " \
+					"must be not used for overlay\n",
+					__func__, ctrl->id);
+			return -1;
+		}
+
 		ctx->overlay.mode = FIMC_OVLY_NOT_FIXED;
+
+		switch (ctx->rotate) {
+		case 0:
+		case 180:
+			ctx->fbuf.fmt.width = ctrl->fb.lcd_hres;
+			ctx->fbuf.fmt.height = ctrl->fb.lcd_vres;
+			break;
+
+		case 90:
+		case 270:
+			ctx->fbuf.fmt.width = ctrl->fb.lcd_vres;
+			ctx->fbuf.fmt.height = ctrl->fb.lcd_hres;
+			break;
+		}
+
+		if (bits_per_pixel == 32)
+			ctx->fbuf.fmt.pixelformat = V4L2_PIX_FMT_RGB32;
+		else
+			ctx->fbuf.fmt.pixelformat = V4L2_PIX_FMT_RGB565;
 	}
 
 	return 0;

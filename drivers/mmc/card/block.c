@@ -23,6 +23,7 @@
 
 #include <linux/kernel.h>
 #include <linux/fs.h>
+#include <linux/slab.h>
 #include <linux/errno.h>
 #include <linux/hdreg.h>
 #include <linux/kdev_t.h>
@@ -34,10 +35,6 @@
 #include <linux/mmc/card.h>
 #include <linux/mmc/host.h>
 #include <linux/mmc/mmc.h>
-//[NAGSM_Android_HDLNC_SDcard_SEOJW_2011_01_12 : eMMC Trim add 
-#if defined (CONFIG_MMC_DISCARD) && defined (CONFIG_S5PC110_DEMPSEY_BOARD)
-#include <linux/mmc/mmc_ioctl.h>
-#endif
 #include <linux/mmc/sd.h>
 
 #include <asm/system.h>
@@ -52,10 +49,6 @@ MODULE_ALIAS("mmc:block");
  */
 #define MMC_SHIFT	3
 #define MMC_NUM_MINORS	(256 >> MMC_SHIFT)
-//[NAGSM_Android_HDLNC_SDcard_SEOJW_2011_01_12 : eMMC Trim add 
-#if defined (CONFIG_MMC_DISCARD) && defined (CONFIG_S5PC110_DEMPSEY_BOARD)
-#define DISCARD_THRESHOLD	65536 /* 32MB threadhold with 512byte sector unit */
-#endif
 
 static DECLARE_BITMAP(dev_use, MMC_NUM_MINORS);
 
@@ -135,73 +128,7 @@ static int mmc_blk_release(struct gendisk *disk, fmode_t mode)
 	mmc_blk_put(md);
 	return 0;
 }
-//[NAGSM_Android_HDLNC_SDcard_SEOJW_2011_01_12 : eMMC Trim add 
-#if defined (CONFIG_MMC_DISCARD) && defined (CONFIG_S5PC110_DEMPSEY_BOARD)
-static int check_eod(struct block_device *bdev, unsigned int from,
-		unsigned int nr)
-{
-	unsigned int maxsector;
-   if (!nr)
-		return 0;
-	maxsector = bdev->bd_inode->i_size >> 9;
-	if (maxsector && (maxsector < nr || maxsector - nr < from))
-		return 1;
-	return 0;
-}
-static int mmc_blk_ioctl(struct block_device *bdev, fmode_t mode,
-		unsigned cmd, unsigned long arg)
-{
-	int err;
-	struct mmc_blk_data *md = bdev->bd_disk->private_data;
-	struct mmc_card *card = md->queue.card;
-   switch (cmd) {
-		case MMCTRIMINFO:
-		{
-			struct mmc_blk_erase_info info;
-			if (!arg)
-				return -EINVAL;
-			mmc_claim_host(card->host);
-			if (!mmc_can_trim(card)) {
-				printk(KERN_ERR "MMCERASEINFO ioctl: MMC can not support trim operation.\n");
-				return -EOPNOTSUPP;
-			}
-			info.pref_trim = card->pref_trim;
-			mmc_release_host(card->host);
-			if (copy_to_user((struct mmc_blk_erase_info __user *)arg, &info,
-						sizeof(struct mmc_blk_erase_info)))
-				return -EFAULT;
-			return 0;
-		}
-		case MMCTRIM:
-		{
-			struct mmc_blk_erase_args args;
-			if (!(mode & FMODE_WRITE)) {
-				printk(KERN_ERR "MMCERASE ioctl: File mode is not write mode.\n"); 
-				return -EBADF;
-			}
-			if (copy_from_user((char *)&args, (void __user *)arg,
-					       sizeof(struct mmc_blk_erase_args)))
-				return -EFAULT;
-			if (check_eod(bdev, args.from, args.nr)) {
-				printk(KERN_ERR "MMCERASE ioctl: File mode is not write mode.\n");
-				return -EINVAL;
-			}
-			mmc_claim_host(card->host);
-			if (!mmc_can_trim(card)) {
-				printk(KERN_ERR "MMCERASE ioctl: MMC can not support trim operation.\n");
-				mmc_release_host(card->host);
-				return -EOPNOTSUPP;
-			}
-			if (bdev != bdev->bd_contains)
-			       args.from += bdev->bd_part->start_sect;
-			err = mmc_erase(card, args.from, args.nr, MMC_TRIM_ARG);
-			mmc_release_host(card->host);
-			return err;
-	       }
-	}
-	return -ENOTTY;
-}
-#endif /* CONFIG_MMC_DISCARD */
+
 static int
 mmc_blk_getgeo(struct block_device *bdev, struct hd_geometry *geo)
 {
@@ -214,10 +141,6 @@ mmc_blk_getgeo(struct block_device *bdev, struct hd_geometry *geo)
 static const struct block_device_operations mmc_bdops = {
 	.open			= mmc_blk_open,
 	.release		= mmc_blk_release,
-//[NAGSM_Android_HDLNC_SDcard_SEOJW_2011_01_12 : eMMC Trim add 
-#if defined (CONFIG_MMC_DISCARD) && defined (CONFIG_S5PC110_DEMPSEY_BOARD)
-	.ioctl			= mmc_blk_ioctl,
-#endif
 	.getgeo			= mmc_blk_getgeo,
 	.owner			= THIS_MODULE,
 };
@@ -344,125 +267,9 @@ mmc_blk_set_blksize(struct mmc_blk_data *md, struct mmc_card *card)
 
 	return 0;
 }
-//[NAGSM_Android_HDLNC_SDcard_SEOJW_2011_01_12 : eMMC Trim add 
-#if defined (CONFIG_MMC_DISCARD) && defined (CONFIG_S5PC110_DEMPSEY_BOARD)
-static int mmc_blk_issue_discard_rq(struct mmc_queue *mq, struct request *req)
-{
-	struct mmc_blk_data *md = mq->data;
-	struct mmc_card *card = md->queue.card;
-	unsigned int from, nr, tmp;
-	int err = 0;
 
-	mmc_claim_host(card->host);
-	if (!mmc_can_trim(card)) {
-		err = -EOPNOTSUPP;
-		goto out;
-	}
-#ifdef CONFIG_MMC_DISCARD_MOVINAND
-   if (card->cid.manfid == MMC_CSD_MANFID_MOVINAND) {
-		if ((card->pref_trim == 0) && 
-			(card->pref_trim > card->erase_size)) {
-			err = -EOPNOTSUPP;
-			goto out;
-		}
-	}
-#endif /* CONFIG_MMC_DISCARD_MOVINAND */
-	from = blk_rq_pos(req);
-	nr = blk_rq_sectors(req);
-#ifdef CONFIG_MMC_DISCARD_DEBUG
-	printk("%s: [new discard] start %u, nr %u\n", req->rq_disk->disk_name, 
-					from, nr);
-#endif /* CONFIG_MMC_DISCARD_DEBUG */
-#ifdef CONFIG_MMC_DISCARD_MERGE
-	if (card->force_erase == 0) {
-		req->bio = NULL;
-		if (card->erase_merged == 0) {
-			card->erase_start = from;
-			card->erase_nr = nr;
-			card->erase_merged++;
-#ifdef CONFIG_MMC_DISCARD_DEBUG
-			printk("%s: [begin] start %u, nr %u\n", req->rq_disk->disk_name, 
-					from, nr);
-#endif /* CONFIG_MMC_DISCARD_DEBUG */
-			if (card->erase_nr >= DISCARD_THRESHOLD)
-				goto force_discard;
-			goto out;
-		} else if (from == (card->erase_start + card->erase_nr)) { /* back merge */
-			card->erase_nr += nr;			
-			card->erase_merged++;
-#ifdef CONFIG_MMC_DISCARD_DEBUG
-			printk("%s: [back merge] start %u, nr %u\n", req->rq_disk->disk_name, 
-					card->erase_start, card->erase_nr);
-			if (card->erase_nr >= DISCARD_THRESHOLD)
-				goto force_discard;
-			goto out;
-#endif /* CONFIG_MMC_DISCARD_DEBUG */
-		} else if (card->erase_start == (from + nr)) { /* front merge */
-			card->erase_start = from;
-			card->erase_nr += nr;						
-			card->erase_merged++;
-#ifdef CONFIG_MMC_DISCARD_DEBUG
-			printk("%s: [front merge] start %u, nr %u\n", req->rq_disk->disk_name, 
-					card->erase_start, card->erase_nr);
-#endif /* CONFIG_MMC_DISCARD_DEBUG */
-			if (card->erase_nr >= DISCARD_THRESHOLD)
-				goto force_discard;
-			goto out;
-		} else { /* not sequential discard request with merged discard requests */
-#ifdef CONFIG_MMC_DISCARD_DEBUG
-			printk("%s: [restart after flush] start %u, nr %u\n", req->rq_disk->disk_name, 
-					from, nr);
-#endif /* CONFIG_MMC_DISCARD_DEBUG */
-			tmp = from;
-			from = card->erase_start;
-			card->erase_start = tmp;
-			tmp = nr;
-			nr = card->erase_nr;
-			card->erase_nr = tmp;
-			card->erase_merged = 1;
-		}
-	} else {
-force_discard:
-#ifdef CONFIG_MMC_DISCARD_DEBUG
-		printk("%s: [force discard] start %u, nr %u\n", req->rq_disk->disk_name, 
-				from, nr);
-#endif /* CONFIG_MMC_DISCARD_DEBUG */
-		from = card->erase_start;
-		nr = card->erase_nr;
-		card->erase_start = 0;
-		card->erase_nr = 0;
-		card->erase_merged = 0;
-	}	
-#endif /* CONFIG_MMC_DISCARD_MERGE */
-	err = mmc_erase(card, from, nr, MMC_TRIM_ARG);
-	if (!err && (card->erase_nr >= DISCARD_THRESHOLD)) {
-		err = mmc_erase(card, card->erase_start, card->erase_nr, MMC_TRIM_ARG);
-		card->erase_start = 0;
-		card->erase_nr = 0;
-		card->erase_merged = 0;
-	}
-out:
-#ifdef CONFIG_MMC_DISCARD_MERGE
-	if (!card->force_erase) {
-#endif /* CONFIG_MMC_DISCARD_MARGE */
-		spin_lock_irq(&md->lock);
-		__blk_end_request(req, err, blk_rq_bytes(req));
-		spin_unlock_irq(&md->lock);
-#ifdef CONFIG_MMC_DISCARD_MERGE
-	} else {
-		card->force_erase = 0;
-	}
-#endif /* CONFIG_MMC_DISCARD_MERGE */
-	mmc_release_host(card->host);
-	return err ? 0 : 1;
-}
-#endif /* CONFIG_MMC_DISCARD */
-//[NAGSM_Android_HDLNC_SDcard_SEOJW_2011_01_12 : eMMC Trim add 
-#if defined (CONFIG_MMC_DISCARD) && defined (CONFIG_S5PC110_DEMPSEY_BOARD)
-static int mmc_blk_issue_rw_rq(struct mmc_queue *mq, struct request *req)
-#else /* CONFIG_MMC_DISCARD */
+
 static int mmc_blk_issue_rq(struct mmc_queue *mq, struct request *req)
-#endif /* CONFIG_MMC_DISCARD */
 {
 	struct mmc_blk_data *md = mq->data;
 	struct mmc_card *card = md->queue.card;
@@ -564,21 +371,7 @@ static int mmc_blk_issue_rq(struct mmc_queue *mq, struct request *req)
 		mmc_wait_for_req(card->host, &brq.mrq);
 
 		mmc_queue_bounce_post(mq);
-#if defined(CONFIG_ARIES_NTT) // Modify NTTS1
-#ifdef	MMC_SECTOR_DEBUG_JAPAN_SYSTEM
-		if(!strcmp(md->disk->disk_name, "mmcblk0")) // mmcblk0 : movinand , mmcblk1 : sdcard
-		{
-			printk(" ==================================== \n ");
-			printk("%s  ,  %s ", md->disk->disk_name, __func__);
-			if(rq_data_dir(req) == READ)
-				printk(" :: READ  \n ");
-			else
-				printk(" :: \t WRITE \n ");
-			printk( "\t pos_sec [ %x ], nr_sector [ %x ] \n",
-					(unsigned int)blk_rq_pos(req), (unsigned int)blk_rq_sectors(req));
-		}
-#endif
-#endif
+
 		/*
 		 * Check for errors here, but don't jump to cmd_err
 		 * until later as we need to wait for the card to leave
@@ -587,7 +380,7 @@ static int mmc_blk_issue_rq(struct mmc_queue *mq, struct request *req)
 		if (brq.cmd.error || brq.data.error || brq.stop.error) {
 			if (brq.data.blocks > 1 && rq_data_dir(req) == READ) {
 				/* Redo read one sector at a time */
-				printk(KERN_DEBUG "%s: retrying using single "
+				printk(KERN_WARNING "%s: retrying using single "
 				       "block read\n", req->rq_disk->disk_name);
 				if(brq.data.error == -EILSEQ) {
 					mq->rx_retries++;
@@ -733,34 +526,7 @@ static int mmc_blk_issue_rq(struct mmc_queue *mq, struct request *req)
 
 	return 0;
 }
-//[NAGSM_Android_HDLNC_SDcard_SEOJW_2011_01_12 : eMMC Trim add 
-#if defined (CONFIG_MMC_DISCARD) && defined (CONFIG_S5PC110_DEMPSEY_BOARD)
-static int mmc_blk_issue_rq(struct mmc_queue *mq, struct request *req)
-{
-	struct mmc_blk_data *md = mq->data;
-	struct mmc_card *card = md->queue.card;
-	unsigned int rw_from, rw_to, discard_from, discard_to;
-   if (blk_discard_rq(req)) {
-		return mmc_blk_issue_discard_rq(mq, req);
-	} else {
-#ifdef CONFIG_MMC_DISCARD_MERGE
-      if (card->erase_merged) {
-			rw_from = blk_rq_pos(req);
-			rw_to = rw_from + blk_rq_sectors(req) - 1;
-			discard_from = card->erase_start;
-			discard_to = discard_from + card->erase_nr - 1;
-			if (((rw_from >= discard_from) && (rw_from <= discard_to)) ||
-						((rw_to >= discard_from) && (rw_to <= discard_to)) ||
-						((rw_from < discard_from) && (rw_to > discard_to))) {
-				card->force_erase = 1;
-            mmc_blk_issue_discard_rq(mq, req);
-			}
-		}
-#endif /* CONFIG_MMC_DISCARD_MERGE */
-		return mmc_blk_issue_rw_rq(mq, req);
-	}
-}
-#endif /* CONFIG_MMC_DISCARD */
+
 
 static inline int mmc_blk_readonly(struct mmc_card *card)
 {
@@ -813,6 +579,7 @@ static struct mmc_blk_data *mmc_blk_alloc(struct mmc_card *card)
 	md->disk->private_data = md;
 	md->disk->queue = md->queue.queue;
 	md->disk->driverfs_dev = &card->dev;
+	md->disk->flags = GENHD_FL_EXT_DEVT;
 
 	/*
 	 * As discussed on lkml, GENHD_FL_REMOVABLE should:

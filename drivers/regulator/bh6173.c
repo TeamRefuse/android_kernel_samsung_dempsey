@@ -24,17 +24,18 @@
 #include <linux/err.h>
 #include <linux/platform_device.h>
 #include <linux/regulator/driver.h>
-#include <linux/regulator/bh6173.h>
+#include <linux/mfd/bh6173.h> //ansari
 #include <linux/mutex.h>
 #include <linux/delay.h>
+#include<linux/slab.h> //ansari
 
 #include <mach/regs-gpio.h>
 #include <plat/gpio-cfg.h>
 #include <mach/hardware.h>
 #include <mach/gpio.h>
 
-//#define DBG(fmt...)				
-#define DBG(fmt...) printk(fmt)
+#define DBG(fmt...)				
+//#define DBG(fmt...) printk(fmt)
 
 
 /* Registers */

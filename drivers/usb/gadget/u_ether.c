@@ -23,6 +23,7 @@
 /* #define VERBOSE_DEBUG */
 
 #include <linux/kernel.h>
+#include <linux/gfp.h>
 #include <linux/device.h>
 #include <linux/ctype.h>
 #include <linux/etherdevice.h>
@@ -240,7 +241,7 @@ rx_submit(struct eth_dev *dev, struct usb_request *req, gfp_t gfp_flags)
 	size -= size % out->maxpacket;
 
 #ifdef CONFIG_USB_GADGET_S3C_OTGD_DMA_MODE
-	/* To fulfill double word alignment requirement*/
+	/* for double word align */
 	skb = alloc_skb(size + NET_IP_ALIGN + 6, gfp_flags);
 #else
 	skb = alloc_skb(size + NET_IP_ALIGN, gfp_flags);
@@ -255,7 +256,7 @@ rx_submit(struct eth_dev *dev, struct usb_request *req, gfp_t gfp_flags)
 	 * RNDIS headers involve variable numbers of LE32 values.
 	 */
 #ifdef CONFIG_USB_GADGET_S3C_OTGD_DMA_MODE
-	/* To fulfill double word alignment requirement*/
+	/* for double word align */
 	skb_reserve(skb, NET_IP_ALIGN + 6);
 #else
 	skb_reserve(skb, NET_IP_ALIGN);
@@ -489,10 +490,12 @@ static void tx_complete(struct usb_ep *ep, struct usb_request *req)
 	list_add(&req->list, &dev->tx_reqs);
 	spin_unlock(&dev->req_lock);
 	dev_kfree_skb_any(skb);
+
 #ifdef CONFIG_USB_GADGET_S3C_OTGD_DMA_MODE
-	if(req->buf != skb->data)
+	if (req->buf != skb->data)
 		kfree(req->buf);
 #endif
+
 	atomic_dec(&dev->tx_qlen);
 	if (netif_carrier_ok(dev->net))
 		netif_wake_queue(dev->net);
@@ -586,20 +589,21 @@ static netdev_tx_t eth_start_xmit(struct sk_buff *skb,
 
 		length = skb->len;
 	}
+
 #ifdef CONFIG_USB_GADGET_S3C_OTGD_DMA_MODE
-	/* To fulfill double word alignment requirement*/
+	/* for double word align */
 	req->buf = kmalloc(skb->len, GFP_ATOMIC | GFP_DMA);
-	if(!req->buf) {
+
+	if (!req->buf) {
 		req->buf = skb->data;
-		printk("%s:: failed to kmalloc\n",__func__);
+		printk("%s: fail to kmalloc [req->buf = skb->data]\n", __FUNCTION__);
 	}
-	else {
-		memcpy((void *) req->buf,(void *) skb->data,skb->len);
-	}
-	
+	else
+		memcpy((void *)req->buf, (void *)skb->data, skb->len);
 #else
 	req->buf = skb->data;
 #endif
+
 	req->context = skb;
 	req->complete = tx_complete;
 
@@ -633,8 +637,10 @@ static netdev_tx_t eth_start_xmit(struct sk_buff *skb,
 		dev_kfree_skb_any(skb);
 drop:
 		dev->net->stats.tx_dropped++;
+
+
 #ifdef CONFIG_USB_GADGET_S3C_OTGD_DMA_MODE
-		if(req->buf != skb->data)
+		if (req->buf != skb->data)
 			kfree(req->buf);
 #endif
 		spin_lock_irqsave(&dev->req_lock, flags);
@@ -744,7 +750,7 @@ static u8 __init nibble(unsigned char c)
 	return 0;
 }
 
-static int __init get_ether_addr(const char *str, u8 *dev_addr)
+static int get_ether_addr(const char *str, u8 *dev_addr)
 {
 	if (str) {
 		unsigned	i;
@@ -776,6 +782,10 @@ static const struct net_device_ops eth_netdev_ops = {
 	.ndo_validate_addr	= eth_validate_addr,
 };
 
+static struct device_type gadget_type = {
+	.name	= "gadget",
+};
+
 /**
  * gether_setup - initialize one ethernet-over-usb link
  * @g: gadget to associated with these links
@@ -789,7 +799,7 @@ static const struct net_device_ops eth_netdev_ops = {
  *
  * Returns negative errno, or zero on success
  */
-int __init gether_setup(struct usb_gadget *g, u8 ethaddr[ETH_ALEN])
+int gether_setup(struct usb_gadget *g, u8 ethaddr[ETH_ALEN])
 {
 	struct eth_dev		*dev;
 	struct net_device	*net;
@@ -838,6 +848,7 @@ int __init gether_setup(struct usb_gadget *g, u8 ethaddr[ETH_ALEN])
 
 	dev->gadget = g;
 	SET_NETDEV_DEV(net, &g->dev);
+	SET_NETDEV_DEVTYPE(net, &gadget_type);
 
 	status = register_netdev(net);
 	if (status < 0) {

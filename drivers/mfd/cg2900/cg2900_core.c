@@ -69,7 +69,8 @@
 /*
  * Timeout values
  */
-#define CHIP_STARTUP_TIMEOUT		(15000)	/* ms */
+//#define CHIP_STARTUP_TIMEOUT		(15000)	/* ms */
+#define CHIP_STARTUP_TIMEOUT		(30000)	/* ms */
 #define CHIP_SHUTDOWN_TIMEOUT		(15000)	/* ms */
 #define LINE_TOGGLE_DETECT_TIMEOUT	(50)	/* ms */
 #define CHIP_READY_TIMEOUT		(100)	/* ms */
@@ -272,7 +273,7 @@ struct core_info {
  * core_info - Main information object for CG2900 Core.
  */
 static struct core_info *core_info;
-
+static struct core_info *bak_core_info;
 /* A define to easily switch between normal usage and test purposes. */
 #if 0
 /* This is test setup */
@@ -613,6 +614,12 @@ static int find_h4_user(int h4_channel, struct cg2900_device **dev,
 	struct cg2900_users *users = &(core_info->users);
 	struct cg2900_h4_channels *chan = &(core_info->h4_channels);
 
+   if(core_info != bak_core_info)
+   {
+      core_info = bak_core_info;
+      users = &(core_info->users);
+      chan = &(core_info->h4_channels);      
+   }
 	if (h4_channel == chan->bt_cmd_channel) {
 		*dev = users->bt_cmd;
 	} else if (h4_channel == chan->bt_acl_channel) {
@@ -1644,6 +1651,8 @@ struct cg2900_device *cg2900_register_user(char  *name,
 
 		err = open_transport();
 		if (err) {
+			/* Close the transport and power off the chip */
+			close_transport();
 			/*
 			 * Remove the user. If there is no error it will be
 			 * freed as well.
@@ -1806,6 +1815,8 @@ int cg2900_write(struct cg2900_device *dev, struct sk_buff *skb)
 	struct cg2900_chip_callbacks *cb;
 
 	CG2900_DBG_DATA("cg2900_write");
+   if(core_info != bak_core_info)
+      core_info = bak_core_info;
 
 	BUG_ON(!core_info);
 
@@ -2117,6 +2128,8 @@ transmit:
 	/* Call the Read callback */
 	if (dev->cb->read_cb)
 		dev->cb->read_cb(dev, skb);
+	else
+		kfree_skb(skb);
 }
 EXPORT_SYMBOL(cg2900_data_from_chip);
 
@@ -2130,7 +2143,7 @@ static int cg2900_init(struct work_struct *work)
 	int err = 0;
 	dev_t temp_devt;
 	struct cg2900_driver_data *dev_data;
-	
+	printk("cg2900_init\n\n\n\n\cg2900_init\n\n\n\n");
 	CG2900_INFO("cg2900_init");
 
 //	schedule_timeout_interruptible(msecs_to_jiffies(DELAY_5_SEC));
@@ -2142,6 +2155,7 @@ static int cg2900_init(struct work_struct *work)
 	}
 
 	core_info = kzalloc(sizeof(*core_info), GFP_KERNEL);
+	bak_core_info = core_info;
 	if (!core_info) {
 		CG2900_ERR("Couldn't allocate core_info");
 		return -ENOMEM;
@@ -2156,8 +2170,16 @@ static int cg2900_init(struct work_struct *work)
 	core_info->h4_channels.bt_cmd_channel = HCI_BT_CMD_H4_CHANNEL;
 	core_info->h4_channels.bt_acl_channel = HCI_BT_ACL_H4_CHANNEL;
 	core_info->h4_channels.bt_evt_channel = HCI_BT_EVT_H4_CHANNEL;
+#if 0 // Hemant: Swapping GNSS and FM Channels	
 	core_info->h4_channels.gnss_channel = HCI_FM_RADIO_H4_CHANNEL;
 	core_info->h4_channels.fm_radio_channel = HCI_GNSS_H4_CHANNEL;
+#else	
+	core_info->h4_channels.gnss_channel = HCI_GNSS_H4_CHANNEL;
+	core_info->h4_channels.fm_radio_channel = HCI_FM_RADIO_H4_CHANNEL;
+#endif	
+	/* ++Hemant:  Add selective debug message */		
+	printk(KERN_ERR "cg2900_init: core_info->main_state = 0x%0x, core_info->boot_state = 0x%0x core_info->transport_state = 0x%0x core_info->h4_channels.gnss_channel = 0x%0x\n", core_info->main_state, core_info->boot_state, core_info->transport_state, core_info->h4_channels.gnss_channel);
+	/* --Hemant:  Add selective debug message */		
 
 	core_info->wq = create_singlethread_workqueue(CORE_WQ_NAME);
 	if (!core_info->wq) {

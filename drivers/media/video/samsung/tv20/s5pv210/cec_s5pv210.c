@@ -2,8 +2,8 @@
  *
  * cec ftn file for Samsung TVOut driver
  *
- * Copyright (c) 2009 Samsung Electronics
- * 	http://www.samsungsemi.com/
+ * Copyright (c) 2010 Samsung Electronics
+ * http://www.samsungsemi.com/
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -12,17 +12,19 @@
 
 #include <linux/module.h>
 #include <linux/kernel.h>
-
-#include <asm/io.h>
+#include <linux/io.h>
 
 #include <mach/map.h>
 #include <mach/regs-clock.h>
-#include "../cec.h"
 #include "regs/regs-cec.h"
+#include <linux/slab.h>
+#include <linux/mm.h>
+
+#include "../cec.h"
 
 #ifdef CECDEBUG
 #define CECPRINTK(fmt, args...) \
-	printk("\t\t[CEC] %s: " fmt, __FUNCTION__ , ## args)
+	printk(KERN_INFO "\t\t[CEC] %s: " fmt, __func__ , ## args)
 #else
 #define CECPRINTK(fmt, args...)
 #endif
@@ -40,7 +42,7 @@ void __s5p_cec_set_divider(void)
 {
 	u32 div_ratio, reg, div_val;
 
-	div_ratio  = S5P_HDMI_FIN/CEC_DIV_RATIO - 1;		
+	div_ratio  = S5P_HDMI_FIN/CEC_DIV_RATIO - 1;
 
 	reg = readl(S5P_HDMI_PHY_CONTROL);
 	reg = (reg & ~(0x3FF<<16)) | (div_ratio << 16);
@@ -55,7 +57,7 @@ void __s5p_cec_set_divider(void)
 	writeb(div_val, cec_base + CEC_DIVISOR_0);
 
 	CECPRINTK("CEC_DIVISOR_3 = 0x%08x\n", readb(cec_base + CEC_DIVISOR_3));
-	CECPRINTK("CEC_DIVISOR_2 = 0x%08x\n", readb(cec_base + CEC_DIVISOR_2));	
+	CECPRINTK("CEC_DIVISOR_2 = 0x%08x\n", readb(cec_base + CEC_DIVISOR_2));
 	CECPRINTK("CEC_DIVISOR_1 = 0x%08x\n", readb(cec_base + CEC_DIVISOR_1));
 	CECPRINTK("CEC_DIVISOR_0 = 0x%08x\n", readb(cec_base + CEC_DIVISOR_0));
 }
@@ -132,8 +134,8 @@ void __s5p_cec_unmask_tx_interrupts(void)
 
 void __s5p_cec_reset(void)
 {
-	writeb(CEC_RX_CTRL_RESET, cec_base + CEC_RX_CTRL); // reset CEC Rx
-	writeb(CEC_TX_CTRL_RESET, cec_base + CEC_TX_CTRL); // reset CEC Tx
+	writeb(CEC_RX_CTRL_RESET, cec_base + CEC_RX_CTRL);
+	writeb(CEC_TX_CTRL_RESET, cec_base + CEC_TX_CTRL);
 
 	CECPRINTK("CEC_RX_CTRL = 0x%08x \n", readb(cec_base + CEC_RX_CTRL));
 	CECPRINTK("CEC_TX_CTRL = 0x%08x \n", readb(cec_base + CEC_TX_CTRL));
@@ -141,22 +143,23 @@ void __s5p_cec_reset(void)
 
 void __s5p_cec_tx_reset(void)
 {
-	writeb(CEC_TX_CTRL_RESET, cec_base + CEC_TX_CTRL); // reset CEC Tx
+	writeb(CEC_TX_CTRL_RESET, cec_base + CEC_TX_CTRL);
 
 	CECPRINTK("CEC_TX_CTRL = 0x%08x \n", readb(cec_base + CEC_TX_CTRL));
 }
 
 void __s5p_cec_rx_reset(void)
 {
-	writeb(CEC_RX_CTRL_RESET, cec_base + CEC_RX_CTRL); // reset CEC Rx
-	CECPRINTK("CEC_RX_CTRL = 0x%08x \n", readb(cec_base + CEC_RX_CTRL));	
+	writeb(CEC_RX_CTRL_RESET, cec_base + CEC_RX_CTRL);
+	CECPRINTK("CEC_RX_CTRL = 0x%08x \n", readb(cec_base + CEC_RX_CTRL));
 }
-	
+
 void __s5p_cec_threshold(void)
 {
-	writeb(CEC_FILTER_THRESHOLD, cec_base + CEC_RX_FILTER_TH); // setup filter
+	writeb(CEC_FILTER_THRESHOLD, cec_base + CEC_RX_FILTER_TH);
 	writeb(0, cec_base + CEC_RX_FILTER_CTRL);
-	CECPRINTK("CEC_RX_FILTER_TH = 0x%08x \n", readb(cec_base + CEC_RX_FILTER_TH));		
+	CECPRINTK("CEC_RX_FILTER_TH = 0x%08x \n",
+		readb(cec_base + CEC_RX_FILTER_TH));
 }
 
 void __s5p_cec_copy_packet(char *data, size_t count)
@@ -200,7 +203,7 @@ void __s5p_cec_set_addr(u32 addr)
 u32 __s5p_cec_get_status(void)
 {
 	u32 status = 0;
-	
+
 	status = readb(cec_base + CEC_STATUS_0);
 	status |= readb(cec_base + CEC_STATUS_1) << 8;
 	status |= readb(cec_base + CEC_STATUS_2) << 16;
@@ -212,40 +215,40 @@ u32 __s5p_cec_get_status(void)
 }
 
 void __s5p_clr_pending_tx(void)
-{		
+{
 	/* clear interrupt pending bit */
 	writeb(CEC_IRQ_TX_DONE | CEC_IRQ_TX_ERROR, cec_base + CEC_IRQ_CLEAR);
 }
 
 void __s5p_clr_pending_rx(void)
-{		
+{
 	/* clear interrupt pending bit */
 	writeb(CEC_IRQ_RX_DONE | CEC_IRQ_RX_ERROR, cec_base + CEC_IRQ_CLEAR);
 }
 
 void __s5p_cec_get_rx_buf(u32 size, u8 *buffer)
 {
-	u32 i=0;
-	
+	u32 i = 0;
+
 	while (i < size) {
 		buffer[i] = readb(cec_base + CEC_RX_BUFF0 + (i * 4));
 		i++;
 	}
-}		
+}
 
 void __init __s5p_cec_probe(struct platform_device *pdev)
 {
 	struct resource *res;
 	size_t	size;
-	int 	ret;
+	int	ret;
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 
 	if (res == NULL) {
-		dev_err(&pdev->dev, 
+		dev_err(&pdev->dev,
 			"failed to get memory region resource for cec\n");
 		ret = -ENOENT;
-		
+
 	}
 
 	size = (res->end - res->start) + 1;
@@ -253,19 +256,19 @@ void __init __s5p_cec_probe(struct platform_device *pdev)
 	cec_mem = request_mem_region(res->start, size, pdev->name);
 
 	if (cec_mem == NULL) {
-		dev_err(&pdev->dev,  
+		dev_err(&pdev->dev,
 			"failed to get memory region for cec\n");
 		ret = -ENOENT;
-		
+
 	}
 
 	cec_base = ioremap(res->start, size);
 
 	if (cec_base == NULL) {
-		dev_err(&pdev->dev,  
+		dev_err(&pdev->dev,
 			"failed to ioremap address region for cec\n");
 		ret = -ENOENT;
-		
+
 
 	}
 
@@ -288,4 +291,4 @@ int __init __s5p_cec_release(struct platform_device *pdev)
 
 	return 0;
 }
-	
+

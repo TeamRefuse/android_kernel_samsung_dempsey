@@ -109,12 +109,15 @@ static void alarm_enqueue_locked(struct alarm *alarm)
 	struct rb_node *parent = NULL;
 	struct alarm *entry;
 	int leftmost = 1;
+	bool was_first = false;
 
 	pr_alarm(FLOW, "added alarm, type %d, func %pF at %lld\n",
 		alarm->type, alarm->function, ktime_to_ns(alarm->expires));
 
-	if (base->first == &alarm->node)
+	if (base->first == &alarm->node) {
 		base->first = rb_next(&alarm->node);
+		was_first = true;
+	}
 	if (!RB_EMPTY_NODE(&alarm->node)) {
 		rb_erase(&alarm->node, &base->alarms);
 		RB_CLEAR_NODE(&alarm->node);
@@ -134,10 +137,10 @@ static void alarm_enqueue_locked(struct alarm *alarm)
 			leftmost = 0;
 		}
 	}
-	if (leftmost) {
+	if (leftmost)
 		base->first = &alarm->node;
-		update_timer_locked(base, false);
-	}
+	if (leftmost || was_first)
+		update_timer_locked(base, was_first);
 
 	rb_link_node(&alarm->node, parent, link);
 	rb_insert_color(&alarm->node, &base->alarms);
@@ -314,8 +317,10 @@ ktime_t alarm_get_elapsed_realtime(void)
 	return now;
 }
 
+#if 0
 extern int is_under_at_sleep_cmd;	//NAGSM_Android_SEL_Kernel_Aakash_20100503
 extern int get_wakelock_for_AT_SLEEP(void); //NAGSM_Android_SEL_Kernel_Aakash_20100503
+#endif
 
 static enum hrtimer_restart alarm_timer_triggered(struct hrtimer *timer)
 {
@@ -325,7 +330,8 @@ static enum hrtimer_restart alarm_timer_triggered(struct hrtimer *timer)
 	ktime_t now;
 
 	spin_lock_irqsave(&alarm_slock, flags);
-	
+
+#if 0
 	//NAGSM_Android_SEL_Kernel_Aakash_20100503
 	//This piece of code needs to be called before acquiring any other wakelock		
 	if(is_under_at_sleep_cmd){	//This is force sleep mode, so aquire wakelock until dfta is functional again.
@@ -333,6 +339,7 @@ static enum hrtimer_restart alarm_timer_triggered(struct hrtimer *timer)
 		is_under_at_sleep_cmd = 0;
 	}
 	//NAGSM_Android_SEL_Kernel_Aakash_20100503
+#endif
 
 	base = container_of(timer, struct alarm_queue, timer);
 	now = base->stopped ? base->stopped_time : hrtimer_cb_get_time(timer);
@@ -384,8 +391,8 @@ static int alarm_suspend(struct platform_device *pdev, pm_message_t state)
 	struct rtc_time     rtc_current_rtc_time;
 	unsigned long       rtc_current_time;
 	unsigned long       rtc_alarm_time;
-	struct timespec     rtc_current_timespec;
 	struct timespec     rtc_delta;
+	struct timespec     wall_time;
 	struct alarm_queue *wakeup_queue = NULL;
 	struct alarm_queue *tmp_queue = NULL;
 
@@ -409,10 +416,11 @@ static int alarm_suspend(struct platform_device *pdev, pm_message_t state)
 		wakeup_queue = tmp_queue;
 	if (wakeup_queue) {
 		rtc_read_time(alarm_rtc_dev, &rtc_current_rtc_time);
-		rtc_current_timespec.tv_nsec = 0;
-		rtc_tm_to_time(&rtc_current_rtc_time,
-			       &rtc_current_timespec.tv_sec);
-		save_time_delta(&rtc_delta, &rtc_current_timespec);
+		getnstimeofday(&wall_time);
+		rtc_tm_to_time(&rtc_current_rtc_time, &rtc_current_time);
+		set_normalized_timespec(&rtc_delta,
+					wall_time.tv_sec - rtc_current_time,
+					wall_time.tv_nsec);
 
 		rtc_alarm_time = timespec_sub(ktime_to_timespec(
 			hrtimer_get_expires(&wakeup_queue->timer)),
@@ -429,7 +437,7 @@ static int alarm_suspend(struct platform_device *pdev, pm_message_t state)
 			rtc_delta.tv_sec, rtc_delta.tv_nsec);
 		if (rtc_current_time + 1 >= rtc_alarm_time) {
 			pr_alarm(SUSPEND, "alarm about to go off\n");
-		//	memset(&rtc_alarm, 0, sizeof(rtc_alarm));
+			memset(&rtc_alarm, 0, sizeof(rtc_alarm));
 			rtc_alarm.enabled = 0;
 			rtc_set_alarm(alarm_rtc_dev, &rtc_alarm);
 
@@ -449,14 +457,14 @@ static int alarm_suspend(struct platform_device *pdev, pm_message_t state)
 
 static int alarm_resume(struct platform_device *pdev)
 {
-	struct rtc_wkalrm rtc_alarm;
+	struct rtc_wkalrm alarm;
 	unsigned long       flags;
 
 	pr_alarm(SUSPEND, "alarm_resume(%p)\n", pdev);
 
-	rtc_read_alarm(alarm_rtc_dev, &rtc_alarm);
-	rtc_alarm.enabled = 0;
-	rtc_set_alarm(alarm_rtc_dev, &rtc_alarm);
+	memset(&alarm, 0, sizeof(alarm));
+	alarm.enabled = 0;
+	rtc_set_alarm(alarm_rtc_dev, &alarm);
 
 	spin_lock_irqsave(&alarm_slock, flags);
 	suspended = false;

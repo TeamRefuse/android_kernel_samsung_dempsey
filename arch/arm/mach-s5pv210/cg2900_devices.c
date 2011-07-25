@@ -24,6 +24,7 @@
 #include <linux/delay.h>
 #include <plat/gpio-cfg.h>
 #include <mach/gpio.h>
+#include <mach/gpio-aries.h>
 
 //++Adding gpio control for power enable 
 /* ++Hemant: ESD Clamp Timing Update */
@@ -37,6 +38,8 @@
 //--Adding gpio control for power enable 
 
 #define GBF_ENA_RESET_GPIO		GPIO_GPS_nRST
+/** GBF_ENA_RESET_NAME - Name of GPIO for enabling/disabling.
+ */
 #define GBF_ENA_RESET_NAME		"gbf_ena_reset"
 
 /* Bluetooth Opcode Group Field */
@@ -270,7 +273,6 @@ int cg2900_devices_init(void)
 		pr_err("PDB gpio_direction_output failed with err: %d", err);
 		goto error_handling2;
 	}
-
 
 	goto finished;
 	

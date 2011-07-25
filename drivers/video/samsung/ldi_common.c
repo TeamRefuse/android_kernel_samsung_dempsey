@@ -49,12 +49,6 @@ extern void mDNIe_Mode_set_for_backlight(u16 *buf);
 extern u16 *pmDNIe_Gamma_set[];
 extern int pre_val;
 extern int autobrightness_mode;
-#if defined (CONFIG_S5PC110_DEMPSEY_BOARD)
-extern int capella_pre_val;
-//extern int taos_pre_val;
-extern int capella_autobrightness_mode;
-extern int taos_autobrightness_mode;
-#endif
 #endif
 ////////////////////////////Need to be Checked
 
@@ -63,7 +57,15 @@ unsigned int g_Brightness_Level;
 int current_gamma_value = -1;
 static int ldi_enable = 0;
 
-static int disp_ready = 0;
+static int disp_ready = 1;
+
+/*********** for debug **********************************************************/
+#if 0
+#define gprintk(fmt, x... ) printk("%s(%d): " fmt, __FUNCTION__ , __LINE__ , ## x)
+#else
+#define gprintk(x...) do { } while (0)
+#endif
+/*******************************************************************************/
 
 
 #ifdef CONFIG_FB_S3C_LDI_ACL
@@ -945,7 +947,7 @@ static ssize_t aclset_file_cmd_store(struct device *dev, struct device_attribute
 	return size;
 }
 
-static DEVICE_ATTR(aclset_file_cmd,0666, aclset_file_cmd_show, aclset_file_cmd_store);
+static DEVICE_ATTR(aclset_file_cmd,0664, aclset_file_cmd_show, aclset_file_cmd_store);
 #endif //CONFIG_FB_S3C_LDI_ACL
 
 
@@ -981,7 +983,7 @@ static ssize_t gammaset_file_cmd_store(struct device *dev, struct device_attribu
 	return size;
 }
 
-static DEVICE_ATTR(gammaset_file_cmd,0666, gammaset_file_cmd_show, gammaset_file_cmd_store);
+static DEVICE_ATTR(gammaset_file_cmd,0664, gammaset_file_cmd_show, gammaset_file_cmd_store);
 #endif
 
 
@@ -1233,6 +1235,62 @@ int ldi_spi_write_byte(int addr, int data)
 }
 #endif //CONFIG_FB_S3C_LDI_ACL
 
+int update_brightness(int bl)
+{
+	int ret = 0;
+
+	if(current_gamma_value == bl)
+		return 1;
+
+	printk("platform brightness level : %d\n",bl);
+	ret=ldi_set_elvss(bl); 
+	if (ret) {
+		gprintk("lcd brightness setting failed.\n");
+		return -EIO;
+	}
+#ifdef CONFIG_FB_S3C_LDI_ACL
+
+	if(acl_cntrl_enable)	
+	{
+		ret = ldi_set_acl(bl); 
+		if (ret) {
+			gprintk("lcd brightness setting failed.\n");
+			return -EIO;
+		}
+	}
+#endif //CONFIG_FB_S3C_LDI_ACL
+
+
+	ret = ldi_gamma_ctl(bl);
+
+	if (ret) {
+		gprintk("lcd brightness setting failed.\n");
+		return -EIO;
+	}
+
+
+
+	if(!IsLDIEnabled())
+	{
+		SetLDIEnabledFlag(1);
+		msleep(10);
+		 ret = ldi_common_enable();
+
+		printk("######## DISP ON#########");
+		if (ret)
+			gprintk("failed to display ON.\n");
+
+	}
+		
+
+	current_gamma_value = bl;
+
+	return 1; 
+
+}
+
+
+
 int ldi_common_init()
 {
 	int ret, i;
@@ -1368,8 +1426,6 @@ int ldi_common_enable()
 		return -1;	
 	}	
 
-	SetLDIEnabledFlag(1);
-
 	return ret;
 }
 
@@ -1443,6 +1499,11 @@ int ldi_power_on()
 		return ret;
 	}
 
+	ret = update_brightness(g_Brightness_Level);
+		if (ret) {
+		dev_err(g_lcd.dev, "failed to initialize brightness\n");
+		return ret;
+	}
 
 	return 0;
 }
@@ -1512,6 +1573,7 @@ int ldi_power_off()
 	return bd->props.brightness;
 }
 
+
  int ldi_set_brightness(struct backlight_device *bd)
 {
 	int ret = 0, brightness = bd->props.brightness;
@@ -1529,13 +1591,6 @@ int ldi_power_off()
 #endif
 
 
-
-	//If Display is OFF Brightness settings on resume always need to be called after LDI init 
-	if(!IsLDIEnabled())
-	{
-	wait_disp_ready();
-	}
-
 	if (brightness < MIN_BRIGHTNESS ||
 		brightness > bd->props.max_brightness) {
 		dev_err(&bd->dev, "lcd brightness should be %d to %d.\n",
@@ -1545,82 +1600,32 @@ int ldi_power_off()
 
 	/* brightness setting from platform is from 0 to 255
 	 * But in this driver, brightness is only supported from 0 to 24 */
-	brightness = g_Brightness_Level = (brightness*10)/106; 
-	
-	if(current_gamma_value == brightness)
-		return; 
-	
-	printk("platform brightness level : %d\n",brightness);
-	ret=ldi_set_elvss(g_Brightness_Level); 
-	if (ret) {
-		dev_err(&bd->dev, "lcd brightness setting failed.\n");
-		return -EIO;
-	}
-#ifdef CONFIG_FB_S3C_LDI_ACL
+	g_Brightness_Level = (brightness*10)/106; 
 
-	if(acl_cntrl_enable)	
+
+	//If Display is OFF Brightness settings on resume always need to be called after LDI init 
+
+	if(disp_ready)
 	{
-		ret = ldi_set_acl(g_Brightness_Level); 
-		if (ret) {
-			dev_err(&bd->dev, "lcd brightness setting failed.\n");
-			return -EIO;
-		}
-	}
-#endif //CONFIG_FB_S3C_LDI_ACL
-
-
-	ret = ldi_gamma_ctl(brightness);
-
-	if (ret) {
-		dev_err(&bd->dev, "lcd brightness setting failed.\n");
-		return -EIO;
-	}
-
-
-
-	if(!IsLDIEnabled())
-	{
-	msleep(10);
-	 ret = ldi_common_enable();
-
-	printk("######## DISP ON#########");
-	 if (ret)
-		dev_err(g_lcd.dev, "failed to display ON.\n");
-
+		update_brightness(g_Brightness_Level);	
 	}
 	else
-		ldi_common_dispon();
-		
-
-
-	gamma_value = brightness;
-
-#if defined (CONFIG_FB_S3C_MDNIE_TUNINGMODE_FOR_BACKLIGHT)
-#if defined (CONFIG_S5PC110_DEMPSEY_BOARD)
-		if ((capella_pre_val==1) && (gamma_value < 24) &&(capella_autobrightness_mode)){
-			mDNIe_Mode_set_for_backlight(pmDNIe_Gamma_set[2]);
-			printk("s5p_bl_update_status - pmDNIe_Gamma_set[2]\n" );
-			capella_pre_val = -1;
-		}
-
-#else
-	if ((pre_val==1) && (gamma_value < 24) &&(autobrightness_mode))		{
-		mDNIe_Mode_set_for_backlight(pmDNIe_Gamma_set[2]);
-		printk("s5p_bl_update_status - pmDNIe_Gamma_set[2]\n" );
-		pre_val = -1;
-	}
-#endif
-#endif
-
-	current_gamma_value = gamma_value;
+		gprintk("g_Brightness_Level = %d, but ldi is not enabled yet\n", g_Brightness_Level);
 
 
 	return ret;
 }
 
+ 
+static int s5p_lcd_check_fb(struct lcd_device *lcddev, struct fb_info *fi)
+ {
+	 return 0;
+ }
+
  struct lcd_ops ldi_lcd_ops = {
 	.set_power = ldi_set_power,
 	.get_power = ldi_get_power,
+	.check_fb = s5p_lcd_check_fb,
 };
 
 struct backlight_ops ldi_backlight_ops  = {
@@ -1827,8 +1832,8 @@ err:
 	g_lcd.ld = ld;
 	
 	
-	bd = backlight_device_register("s5p_bl", &spi->dev,&g_lcd, &ldi_backlight_ops);
-	//bd = backlight_device_register("pwm-backlight", &spi->dev,&g_lcd, &ldi_backlight_ops,NULL);
+	//bd = backlight_device_register("s5p_bl", &spi->dev,&g_lcd, &ldi_backlight_ops);
+	bd = backlight_device_register("s5p_bl", &spi->dev,&g_lcd, &ldi_backlight_ops,NULL);//ansari
 	if (IS_ERR(ld)) {
 		ret = PTR_ERR(ld);
 		goto out_free_lcd;
@@ -1944,6 +1949,8 @@ err:
 
 
 	SetLDIEnabledFlag(1);
+	disp_ready = 1; 
+
 
 	printk("ldi panel driver has been probed.\n");
 	return 0;

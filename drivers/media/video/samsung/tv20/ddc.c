@@ -7,20 +7,11 @@
 
 const static u16 ignore[] = { I2C_CLIENT_END };
 const static u16 normal_addr[] = {
-	(S5P_HDCP_I2C_ADDR >> 1), 
-	I2C_CLIENT_END 
+	(S5P_HDCP_I2C_ADDR >> 1),
+	I2C_CLIENT_END
 };
 
-const static u16 *forces[] = { NULL };
-
-static struct i2c_client_address_data ddc_addr = {
-	.normal_i2c	= normal_addr,
-	.probe		= ignore,
-	.ignore		= ignore,
-	.forces		= forces,
-};
-
-struct i2c_client *ddc_port = NULL;
+struct i2c_client *ddc_port;
 
 /*
  * DDC read ftn.
@@ -31,17 +22,17 @@ int ddc_read(u8 subaddr, u8 *data, u16 len)
 	int ret = 0;
 
 	struct i2c_msg msg[] = {
-		[0] = { 
-			.addr = ddc_port->addr, 
+		[0] = {
+			.addr = ddc_port->addr,
 			.flags = 0,
-			.len = 1, 
+			.len = 1,
 			.buf = &addr
-		}, 
-		[1] = { 
-			.addr = ddc_port->addr, 
+		},
+		[1] = {
+			.addr = ddc_port->addr,
 			.flags = I2C_M_RD,
 			.len = len,
-			.buf = data 
+			.buf = data
 		}
 	};
 
@@ -70,7 +61,7 @@ EXPORT_SYMBOL(ddc_write);
 /*
  * i2c client ftn.
  */
-static int __devinit ddc_probe(struct i2c_client *client, 
+static int __devinit ddc_probe(struct i2c_client *client,
 			const struct i2c_device_id *dev_id)
 {
 	int ret = 0;
@@ -115,8 +106,7 @@ static struct i2c_driver ddc_driver = {
 	.id_table 	= ddc_idtable,
 	.probe 		= ddc_probe,
 	.remove 	= __devexit_p(ddc_remove),
-	.address_data 	= &ddc_addr,
-	
+	.address_list 	= &normal_addr,
 	.suspend	= ddc_suspend,
 	.resume 	= ddc_resume,
 };

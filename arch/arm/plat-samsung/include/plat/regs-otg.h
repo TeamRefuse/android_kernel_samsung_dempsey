@@ -17,7 +17,7 @@
 #define S3C_USBOTG_PHYPWR		S3C_USBOTG_PHYREG(0x0)
 #define S3C_USBOTG_PHYCLK		S3C_USBOTG_PHYREG(0x4)
 #define S3C_USBOTG_RSTCON		S3C_USBOTG_PHYREG(0x8)
-
+#define S3C_USBOTG_PHYTUNE		S3C_USBOTG_PHYREG(0x24)
 
 /* USB2.0 OTG Controller register */
 #define S3C_USBOTGREG(x) ((x) + S3C_VA_OTG)
@@ -169,7 +169,7 @@
 #define RX_FIFO_SIZE			(4096>>2)
 #define NPTX_FIFO_START_ADDR		RX_FIFO_SIZE
 #define NPTX_FIFO_SIZE			(4096>>2)
-#define PTX_FIFO_SIZE			(1024>>2)
+#define PTX_FIFO_SIZE			(1024>>1)
 
 /* Enumeration speed */
 #define USB_HIGH_30_60MHZ		(0x0<<1)

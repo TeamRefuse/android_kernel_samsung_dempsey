@@ -1,24 +1,34 @@
-/*===========================================================================
+/***************************************************************************
 
+* 
 
-                        SiI9234 Driver Processor
-              
+*   SiI9244 - MHL Transmitter Driver
 
+*
 
-DESCRIPTION
+* Copyright (C) (2011, Silicon Image Inc)
 
-  This file explains the SiI9234 initialization and call the virtual main function.
+*
 
+* This program is free software; you can redistribute it and/or modify
 
+* it under the terms of the GNU General Public License as published by
 
+* the Free Software Foundation version 2.
 
- Copyright (c) 2002-2009, Silicon Image, Inc.  All rights reserved.             
-  No part of this work may be reproduced, modified, distributed, transmitted,    
- transcribed, or translated into any language or computer format, in any form   
-or by any means without written permission of: Silicon Image, Inc.,            
-1060 East Arques Avenue, Sunnyvale, California 94085                           
-===========================================================================*/
+*
 
+* This program is distributed ¢®¡Æas is¢®¡¾ WITHOUT ANY WARRANTY of any
+
+* kind, whether express or implied; without even the implied warranty
+
+* of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+
+* GNU General Public License for more details.
+
+*
+
+*****************************************************************************/
 
 
 /*===========================================================================
@@ -106,7 +116,8 @@ when              who                         what, where, why
 //
 #define	DISABLE_DISCOVERY				CLR_BIT(SA_TX_Page0_Primary, 0x90, 0);
 #define	ENABLE_DISCOVERY				SET_BIT(SA_TX_Page0_Primary, 0x90, 0);
-////	Look for interrupts on INTR_4 (Register 0x74)
+//
+//	Look for interrupts on INTR_4 (Register 0x74)
 //		7 = PVT_HTBT(reserved)
 //		6 = RGND RDY		(interested)
 //		5 = VBUS low(interested)	
@@ -127,8 +138,10 @@ when              who                         what, where, why
 //		3 = RSVD		(reserved)
 //		2 = RSVD		(reserved)
 //		1 = RSVD		(reserved)
-//		0 = RSVD		(reserved)//3355
-#define	INTR_1_DESIRED_MASK				(BIT_5|BIT_6) #define	UNMASK_INTR_1_INTERRUPTS		I2C_WriteByte(SA_TX_Page0_Primary, 0x75, 0x00)
+//		0 = RSVD		(reserved)
+//3355
+#define	INTR_1_DESIRED_MASK				(BIT_5|BIT_6) 
+#define	UNMASK_INTR_1_INTERRUPTS		I2C_WriteByte(SA_TX_Page0_Primary, 0x75, 0x00)
 #define	MASK_INTR_1_INTERRUPTS			I2C_WriteByte(SA_TX_Page0_Primary, 0x75, INTR_1_DESIRED_MASK)
 //3355
 //	Look for interrupts on CBUS:CBUS_INTR_STATUS [0xC8:0x08]
@@ -140,10 +153,12 @@ when              who                         what, where, why
 //		2 = DDC_ABORT		(interested)
 //		1 = RSVD			(reserved)
 //		0 = rsvd			(reserved)
-#define	INTR_CBUS1_DESIRED_MASK			(BIT_2 | BIT_3 | BIT_4 | BIT_5 | BIT_6)#define	UNMASK_CBUS1_INTERRUPTS		I2C_WriteByte(SA_TX_CBUS_Primary, 0x09, 0x00)	
+#define	INTR_CBUS1_DESIRED_MASK			(BIT_2 | BIT_3 | BIT_4 | BIT_5 | BIT_6)
+#define	UNMASK_CBUS1_INTERRUPTS		I2C_WriteByte(SA_TX_CBUS_Primary, 0x09, 0x00)	
 #define	MASK_CBUS1_INTERRUPTS			I2C_WriteByte(SA_TX_CBUS_Primary, 0x09, INTR_CBUS1_DESIRED_MASK)
 
-#define	INTR_CBUS2_DESIRED_MASK			(BIT_2 | BIT_3)#define	UNMASK_CBUS2_INTERRUPTS		 I2C_WriteByte(SA_TX_CBUS_Primary, 0x1F, 0x00)	
+#define	INTR_CBUS2_DESIRED_MASK			(BIT_2 | BIT_3)
+#define	UNMASK_CBUS2_INTERRUPTS		 I2C_WriteByte(SA_TX_CBUS_Primary, 0x1F, 0x00)	
 #define	MASK_CBUS2_INTERRUPTS			 I2C_WriteByte(SA_TX_CBUS_Primary, 0x1F, INTR_CBUS2_DESIRED_MASK)
 
 #define		MHL_TX_EVENT_NONE			0x00	/* No event worth reporting.  */
@@ -189,8 +204,74 @@ static	bool		mscCmdInProgress;	// FALSE when it is okay to send a new command
 //
 static	byte	dsHpdStatus = 0;
 
-byte mhl_cable_status =MHL_INIT_POWER_OFF;			//NAGSM_Android_SEL_Kernel_Aakash_20101214#define	MHL_MAX_RCP_KEY_CODE	(0x7F + 1)	// inclusivebyte		rcpSupportTable [MHL_MAX_RCP_KEY_CODE] = {	(MHL_DEV_LD_GUI),		// 0x00 = Select	(MHL_DEV_LD_GUI),		// 0x01 = Up	(MHL_DEV_LD_GUI),		// 0x02 = Down	(MHL_DEV_LD_GUI),		// 0x03 = Left	(MHL_DEV_LD_GUI),		// 0x04 = Right	0, 0, 0, 0,				// 05-08 Reserved	(MHL_DEV_LD_GUI),		// 0x09 = Root Menu	0, 0, 0,				// 0A-0C Reserved	(MHL_DEV_LD_GUI),		// 0x0D = Select	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,	// 0E-1F Reserved	0,//(MHL_DEV_LD_VIDEO | MHL_DEV_LD_AUDIO | MHL_DEV_LD_MEDIA | MHL_DEV_LD_TUNER),	// Numeric keys 0x20-0x29	0,//	(MHL_DEV_LD_VIDEO | MHL_DEV_LD_AUDIO | MHL_DEV_LD_MEDIA | MHL_DEV_LD_TUNER),	0,//	(MHL_DEV_LD_VIDEO | MHL_DEV_LD_AUDIO | MHL_DEV_LD_MEDIA | MHL_DEV_LD_TUNER),	0,//	(MHL_DEV_LD_VIDEO | MHL_DEV_LD_AUDIO | MHL_DEV_LD_MEDIA | MHL_DEV_LD_TUNER),	0,//	(MHL_DEV_LD_VIDEO | MHL_DEV_LD_AUDIO | MHL_DEV_LD_MEDIA | MHL_DEV_LD_TUNER),	0,//	(MHL_DEV_LD_VIDEO | MHL_DEV_LD_AUDIO | MHL_DEV_LD_MEDIA | MHL_DEV_LD_TUNER),	0,//	(MHL_DEV_LD_VIDEO | MHL_DEV_LD_AUDIO | MHL_DEV_LD_MEDIA | MHL_DEV_LD_TUNER),	0,//	(MHL_DEV_LD_VIDEO | MHL_DEV_LD_AUDIO | MHL_DEV_LD_MEDIA | MHL_DEV_LD_TUNER),	0,//	(MHL_DEV_LD_VIDEO | MHL_DEV_LD_AUDIO | MHL_DEV_LD_MEDIA | MHL_DEV_LD_TUNER),	0,//	(MHL_DEV_LD_VIDEO | MHL_DEV_LD_AUDIO | MHL_DEV_LD_MEDIA | MHL_DEV_LD_TUNER),	0,						// 0x2A = Dot	0,//	(MHL_DEV_LD_VIDEO | MHL_DEV_LD_AUDIO | MHL_DEV_LD_MEDIA | MHL_DEV_LD_TUNER),	// Enter key = 0x2B	0,//	(MHL_DEV_LD_VIDEO | MHL_DEV_LD_AUDIO | MHL_DEV_LD_MEDIA | MHL_DEV_LD_TUNER),	// Clear key = 0x2C	0, 0, 0,				// 2D-2F Reserved	0,//	(MHL_DEV_LD_TUNER),		// 0x30 = Channel Up	0,//	(MHL_DEV_LD_TUNER),		// 0x31 = Channel Dn	0,//	(MHL_DEV_LD_TUNER),		// 0x32 = Previous Channel	0,//	(MHL_DEV_LD_AUDIO),		// 0x33 = Sound Select	0,						// 0x34 = Input Select	0,						// 0x35 = Show Information	0,						// 0x36 = Help	0,						// 0x37 = Page Up	0,						// 0x38 = Page 
-	0, 0, 0, 0, 0, 0, 0,	// 0x39-0x3F Reserved	0,						// 0x40 = Undefined	0,//	(MHL_DEV_LD_SPEAKER),	// 0x41 = Volume Up	0,//	(MHL_DEV_LD_SPEAKER),	// 0x42 = Volume Down	0,//	(MHL_DEV_LD_SPEAKER),	// 0x43 = Mute	(MHL_DEV_LD_VIDEO | MHL_DEV_LD_AUDIO),	// 0x44 = Play	(MHL_DEV_LD_VIDEO | MHL_DEV_LD_AUDIO | MHL_DEV_LD_RECORD),	// 0x45 = Stop	(MHL_DEV_LD_VIDEO | MHL_DEV_LD_AUDIO | MHL_DEV_LD_RECORD),	// 0x46 = Pause	0,//	(MHL_DEV_LD_RECORD),	// 0x47 = Record	(MHL_DEV_LD_VIDEO | MHL_DEV_LD_AUDIO),	// 0x48 = Rewind	(MHL_DEV_LD_VIDEO | MHL_DEV_LD_AUDIO),	// 0x49 = Fast Forward	0,//	(MHL_DEV_LD_MEDIA),		// 0x4A = Eject	0,//	(MHL_DEV_LD_VIDEO | MHL_DEV_LD_AUDIO | MHL_DEV_LD_MEDIA),	// 0x4B = Forward	0,//	(MHL_DEV_LD_VIDEO | MHL_DEV_LD_AUDIO | MHL_DEV_LD_MEDIA),	// 0x4C = Backward	0, 0, 0,				// 4D-4F Reserved	0,						// 0x50 = Angle	0,						// 0x51 = Subpicture	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // 52-5F Reserved	(MHL_DEV_LD_VIDEO | MHL_DEV_LD_AUDIO),	// 0x60 = Play Function	(MHL_DEV_LD_VIDEO | MHL_DEV_LD_AUDIO),	// 0x61 = Pause the Play Function	0,//	(MHL_DEV_LD_RECORD),	// 0x62 = Record Function	0,//	(MHL_DEV_LD_RECORD),	// 0x63 = Pause the Record Function	(MHL_DEV_LD_VIDEO | MHL_DEV_LD_AUDIO | MHL_DEV_LD_RECORD),	// 0x64 = Stop Function	0,//	(MHL_DEV_LD_SPEAKER),	// 0x65 = Mute Function	0,//	(MHL_DEV_LD_SPEAKER),	// 0x66 = Restore Mute Function	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 	// Undefined or reserved	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 		// Undefined or reserved};bool vbus_mhl_est_fail = FALSE;//3355
+byte mhl_cable_status =MHL_INIT_POWER_OFF;			//NAGSM_Android_SEL_Kernel_Aakash_20101214
+
+#define	MHL_MAX_RCP_KEY_CODE	(0x7F + 1)	// inclusive
+byte		rcpSupportTable [MHL_MAX_RCP_KEY_CODE] = {
+	(MHL_DEV_LD_GUI),		// 0x00 = Select
+	(MHL_DEV_LD_GUI),		// 0x01 = Up
+	(MHL_DEV_LD_GUI),		// 0x02 = Down
+	(MHL_DEV_LD_GUI),		// 0x03 = Left
+	(MHL_DEV_LD_GUI),		// 0x04 = Right
+	0, 0, 0, 0,				// 05-08 Reserved
+	(MHL_DEV_LD_GUI),		// 0x09 = Root Menu
+	0, 0, 0,				// 0A-0C Reserved
+	(MHL_DEV_LD_GUI),		// 0x0D = Select
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,	// 0E-1F Reserved
+	0,//(MHL_DEV_LD_VIDEO | MHL_DEV_LD_AUDIO | MHL_DEV_LD_MEDIA | MHL_DEV_LD_TUNER),	// Numeric keys 0x20-0x29
+	0,//	(MHL_DEV_LD_VIDEO | MHL_DEV_LD_AUDIO | MHL_DEV_LD_MEDIA | MHL_DEV_LD_TUNER),
+	0,//	(MHL_DEV_LD_VIDEO | MHL_DEV_LD_AUDIO | MHL_DEV_LD_MEDIA | MHL_DEV_LD_TUNER),
+	0,//	(MHL_DEV_LD_VIDEO | MHL_DEV_LD_AUDIO | MHL_DEV_LD_MEDIA | MHL_DEV_LD_TUNER),
+	0,//	(MHL_DEV_LD_VIDEO | MHL_DEV_LD_AUDIO | MHL_DEV_LD_MEDIA | MHL_DEV_LD_TUNER),
+	0,//	(MHL_DEV_LD_VIDEO | MHL_DEV_LD_AUDIO | MHL_DEV_LD_MEDIA | MHL_DEV_LD_TUNER),
+	0,//	(MHL_DEV_LD_VIDEO | MHL_DEV_LD_AUDIO | MHL_DEV_LD_MEDIA | MHL_DEV_LD_TUNER),
+	0,//	(MHL_DEV_LD_VIDEO | MHL_DEV_LD_AUDIO | MHL_DEV_LD_MEDIA | MHL_DEV_LD_TUNER),
+	0,//	(MHL_DEV_LD_VIDEO | MHL_DEV_LD_AUDIO | MHL_DEV_LD_MEDIA | MHL_DEV_LD_TUNER),
+	0,//	(MHL_DEV_LD_VIDEO | MHL_DEV_LD_AUDIO | MHL_DEV_LD_MEDIA | MHL_DEV_LD_TUNER),
+	0,						// 0x2A = Dot
+	0,//	(MHL_DEV_LD_VIDEO | MHL_DEV_LD_AUDIO | MHL_DEV_LD_MEDIA | MHL_DEV_LD_TUNER),	// Enter key = 0x2B
+	0,//	(MHL_DEV_LD_VIDEO | MHL_DEV_LD_AUDIO | MHL_DEV_LD_MEDIA | MHL_DEV_LD_TUNER),	// Clear key = 0x2C
+	0, 0, 0,				// 2D-2F Reserved
+	0,//	(MHL_DEV_LD_TUNER),		// 0x30 = Channel Up
+	0,//	(MHL_DEV_LD_TUNER),		// 0x31 = Channel Dn
+	0,//	(MHL_DEV_LD_TUNER),		// 0x32 = Previous Channel
+	0,//	(MHL_DEV_LD_AUDIO),		// 0x33 = Sound Select
+	0,						// 0x34 = Input Select
+	0,						// 0x35 = Show Information
+	0,						// 0x36 = Help
+	0,						// 0x37 = Page Up
+	0,						// 0x38 = Page 
+	0, 0, 0, 0, 0, 0, 0,	// 0x39-0x3F Reserved
+	0,						// 0x40 = Undefined
+
+	0,//	(MHL_DEV_LD_SPEAKER),	// 0x41 = Volume Up
+	0,//	(MHL_DEV_LD_SPEAKER),	// 0x42 = Volume Down
+	0,//	(MHL_DEV_LD_SPEAKER),	// 0x43 = Mute
+	(MHL_DEV_LD_VIDEO | MHL_DEV_LD_AUDIO),	// 0x44 = Play
+	(MHL_DEV_LD_VIDEO | MHL_DEV_LD_AUDIO | MHL_DEV_LD_RECORD),	// 0x45 = Stop
+	(MHL_DEV_LD_VIDEO | MHL_DEV_LD_AUDIO | MHL_DEV_LD_RECORD),	// 0x46 = Pause
+	0,//	(MHL_DEV_LD_RECORD),	// 0x47 = Record
+	(MHL_DEV_LD_VIDEO | MHL_DEV_LD_AUDIO),	// 0x48 = Rewind
+	(MHL_DEV_LD_VIDEO | MHL_DEV_LD_AUDIO),	// 0x49 = Fast Forward
+	0,//	(MHL_DEV_LD_MEDIA),		// 0x4A = Eject
+	0,//	(MHL_DEV_LD_VIDEO | MHL_DEV_LD_AUDIO | MHL_DEV_LD_MEDIA),	// 0x4B = Forward
+	0,//	(MHL_DEV_LD_VIDEO | MHL_DEV_LD_AUDIO | MHL_DEV_LD_MEDIA),	// 0x4C = Backward
+	0, 0, 0,				// 4D-4F Reserved
+	0,						// 0x50 = Angle
+	0,						// 0x51 = Subpicture
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // 52-5F Reserved
+	(MHL_DEV_LD_VIDEO | MHL_DEV_LD_AUDIO),	// 0x60 = Play Function
+	(MHL_DEV_LD_VIDEO | MHL_DEV_LD_AUDIO),	// 0x61 = Pause the Play Function
+	0,//	(MHL_DEV_LD_RECORD),	// 0x62 = Record Function
+	0,//	(MHL_DEV_LD_RECORD),	// 0x63 = Pause the Record Function
+	(MHL_DEV_LD_VIDEO | MHL_DEV_LD_AUDIO | MHL_DEV_LD_RECORD),	// 0x64 = Stop Function
+
+	0,//	(MHL_DEV_LD_SPEAKER),	// 0x65 = Mute Function
+	0,//	(MHL_DEV_LD_SPEAKER),	// 0x66 = Restore Mute Function
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 	// Undefined or reserved
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 		// Undefined or reserved
+};
+bool vbus_mhl_est_fail = FALSE;//3355
 bool mhl_vbus = FALSE;//3355
 /*===========================================================================
                    FUNCTION DEFINITIONS
@@ -259,7 +340,8 @@ Bool SiI9234_init(void);
 void SiI9234_interrupt_event(void);
 
 
-void	ProcessRgnd( void );
+
+void	ProcessRgnd( void );
 
 extern void rcp_cbus_uevent(u8);		//NAGSM_Android_SEL_Kernel_Aakash_20101206
 
@@ -283,7 +365,8 @@ extern void rcp_cbus_uevent(u8);		//NAGSM_Android_SEL_Kernel_Aakash_20101206
   None
 ===========================================================================*/
 void DelayMS(word msec)
-{  //mdelay(msec);
+{
+  //mdelay(msec);
   msleep(msec);
 }
 
@@ -308,10 +391,10 @@ void SiI9234_HW_Reset(void)
 	TX_DEBUG_PRINT2((">>TxHW_Reset()\n"));
 
 	s3c_gpio_setpull(GPIO_MHL_RST, S3C_GPIO_PULL_NONE);
-	s3c_gpio_setpin(GPIO_MHL_RST, 0);
+	gpio_set_value(GPIO_MHL_RST, 0);
 	//PinTxHwReset = LOW;
 	DelayMS(TX_HW_RESET_PERIOD);
-	s3c_gpio_setpin(GPIO_MHL_RST, 1);
+	gpio_set_value(GPIO_MHL_RST, 1);
 }
 
 /*===========================================================================
@@ -485,7 +568,8 @@ void	SiiMhlTxDrvTmdsControl( bool enable )
 	if( enable )
 	{
 		SET_BIT(SA_TX_Page0_Primary, 0x80, 4);
-	    TX_DEBUG_PRINT(("Drv: TMDS Output Enabled\n"));//3355
+	    TX_DEBUG_PRINT(("Drv: TMDS Output Enabled\n"));
+//3355
      {
       byte		rsen  = I2C_ReadByte(SA_TX_Page0_Primary, 0x09) & BIT_2;
       if(vbus_mhl_est_fail == TRUE)
@@ -561,7 +645,8 @@ bool SiiMhlTxDrvSendCbusCommand ( cbus_req_t *pReq  )
 	//
 	// If not connected, return with error
 	//
-	//if( (TX_POWER_STATE_D0_MHL != fwPowerState ) || (0 == ReadByteCBUS(0x0a) || mscCmdInProgress))  if( (TX_POWER_STATE_D0_MHL != fwPowerState ) || (mscCmdInProgress))
+	//if( (TX_POWER_STATE_D0_MHL != fwPowerState ) || (0 == ReadByteCBUS(0x0a) || mscCmdInProgress))
+  if( (TX_POWER_STATE_D0_MHL != fwPowerState ) || (mscCmdInProgress))
 	{
 	    TX_DEBUG_PRINT(("Error: Drv: fwPowerState: %02X, CBUS[0x0A]: %02X or mscCmdInProgress = %d\n",
 				(int) fwPowerState,
@@ -693,7 +778,8 @@ void	Int1RsenIsr( void )
 		// Allow RSEN to stay low this much before reacting
 		//
 		if(rsen == 0x00)
-		{	      		if(TX_POWER_STATE_D0_MHL != fwPowerState)
+		{
+	      		if(TX_POWER_STATE_D0_MHL != fwPowerState)
 	      		{
 				TX_DEBUG_PRINT (("Drv: Got1 INTR_1: reg71 = %02X, rsen = %02X\n", (int) reg71, (int) rsen));
 				I2C_WriteByte(SA_TX_Page0_Primary, 0x71, reg71);
@@ -729,7 +815,8 @@ void	Int1RsenIsr( void )
 			For_check_resen_int();
 			fwPowerState = TX_POWER_STATE_D3;
 
-				EnableFSA9480Interrupts();			//s3c_gpio_setpin(GPIO_MHL_SEL, 0);
+				EnableFSA9480Interrupts();
+			//s3c_gpio_setpin(GPIO_MHL_SEL, 0);
 			//TX_DEBUG_PRINT2(KERN_ERR "MHL_SEL to 0\n");
 			return ;
 		      	}
@@ -748,10 +835,12 @@ void	Int1RsenIsr( void )
 			//NAGSM_Android_SEL_Kernel_Aakash_20101214
 		}
 		else if(rsen == 0x04)
-		{  		        mhl_cable_status |= MHL_RSEN_VERIFIED;
+		{
+  		        mhl_cable_status |= MHL_RSEN_VERIFIED;
 			TX_DEBUG_PRINT2("MHL Cable Connection ###\n");
 
-		}
+
+		}
 		// Clear MDI_RSEN interrupt
 		
 	}
@@ -788,14 +877,14 @@ void	Int1RsenIsr( void )
 				UNMASK_CBUS1_INTERRUPTS;
 				UNMASK_CBUS2_INTERRUPTS;
 				mhl_cable_status = MHL_INIT_POWER_OFF;//Rajucm: fix for RCP HDMI cable disconnect and connect
-				mhl_hpd_handle(false);
+				mhl_hpd_handle(false); 
 				dsHpdStatus =0;
 				}
 				else
 				{
 				MASK_CBUS1_INTERRUPTS;
 				MASK_CBUS2_INTERRUPTS;
-				mhl_hpd_handle(true);
+				mhl_hpd_handle(true); 
 				dsHpdStatus =1;
 			}
 			#endif
@@ -916,19 +1005,24 @@ static void DeglitchRsenLow( void )
 
 
 	// Changed from 66 to 65 for 94[1:0] = 01 = 5k reg_cbusmhl_pup_sel
-	//I2C_WriteByte(SA_TX_Page0_Primary, 0x94, 0x65);			// 1.8V CBUS VTH & GND threshold    I2C_WriteByte(SA_TX_Page0_Primary, 0x94, 0x75);			// 1.8V CBUS VTH & GND threshold
+	//I2C_WriteByte(SA_TX_Page0_Primary, 0x94, 0x65);			// 1.8V CBUS VTH & GND threshold
+    I2C_WriteByte(SA_TX_Page0_Primary, 0x94, 0x75);			// 1.8V CBUS VTH & GND threshold
 
 	//set bit 2 and 3, which is Initiator Timeout
 	I2C_WriteByte(SA_TX_CBUS_Primary, 0x31, I2C_ReadByte(SA_TX_CBUS_Primary, 0x31) | 0x0c);
 
-	//I2C_WriteByte(SA_TX_Page0_Primary, 0xA5, 0xAC);			// RGND Hysterisis.    I2C_WriteByte(SA_TX_Page0_Primary, 0xA5, 0xA0);			
+	//I2C_WriteByte(SA_TX_Page0_Primary, 0xA5, 0xAC);			// RGND Hysterisis.
+    I2C_WriteByte(SA_TX_Page0_Primary, 0xA5, 0xA0);			
 	TX_DEBUG_PRINT(("Drv: MHL 1.0 Compliant Clock\n"));
 	
 	// RGND & single discovery attempt (RGND blocking)
 	I2C_WriteByte(SA_TX_Page0_Primary, 0x95, 0x31);
 
 	// use 1K and 2K setting
-	//I2C_WriteByte(SA_TX_Page0_Primary, 0x96, 0x22);	// Use VBUS path of discovery state machine	I2C_WriteByte(SA_TX_Page0_Primary, 0x97, 0x00);
+	//I2C_WriteByte(SA_TX_Page0_Primary, 0x96, 0x22);
+
+	// Use VBUS path of discovery state machine
+	I2C_WriteByte(SA_TX_Page0_Primary, 0x97, 0x00);
 	ReadModifyWriteTPI(0x95, BIT_6, BIT_6);		// Force USB ID switch to open
 
 	//
@@ -1080,19 +1174,26 @@ void CbusWakeUpPulseGenerator()
 	//I2C_WriteByte(SA_TX_Page0_Primary, 0x92, (I2C_ReadByte(SA_TX_Page0_Primary, 0x92) | 0x10));
 
 	// Start the pulse
-	I2C_WriteByte(SA_TX_Page0_Primary, 0x96, (I2C_ReadByte(SA_TX_Page0_Primary, 0x96) | 0xC0));    mdelay(T_SRC_WAKE_PULSE_WIDTH_1);	// adjust for code path
+	I2C_WriteByte(SA_TX_Page0_Primary, 0x96, (I2C_ReadByte(SA_TX_Page0_Primary, 0x96) | 0xC0));
+    mdelay(T_SRC_WAKE_PULSE_WIDTH_1);	// adjust for code path
 
-	I2C_WriteByte(SA_TX_Page0_Primary, 0x96, (I2C_ReadByte(SA_TX_Page0_Primary, 0x96) & 0x3F));   mdelay(T_SRC_WAKE_PULSE_WIDTH_1);	// adjust for code path
+	I2C_WriteByte(SA_TX_Page0_Primary, 0x96, (I2C_ReadByte(SA_TX_Page0_Primary, 0x96) & 0x3F));
+   mdelay(T_SRC_WAKE_PULSE_WIDTH_1);	// adjust for code path
 
-	I2C_WriteByte(SA_TX_Page0_Primary, 0x96, (I2C_ReadByte(SA_TX_Page0_Primary, 0x96) | 0xC0));    mdelay(T_SRC_WAKE_PULSE_WIDTH_1);	// adjust for code path
+	I2C_WriteByte(SA_TX_Page0_Primary, 0x96, (I2C_ReadByte(SA_TX_Page0_Primary, 0x96) | 0xC0));
+    mdelay(T_SRC_WAKE_PULSE_WIDTH_1);	// adjust for code path
 
-	I2C_WriteByte(SA_TX_Page0_Primary, 0x96, (I2C_ReadByte(SA_TX_Page0_Primary, 0x96) & 0x3F));    mdelay(T_SRC_WAKE_PULSE_WIDTH_2);	// adjust for code path
+	I2C_WriteByte(SA_TX_Page0_Primary, 0x96, (I2C_ReadByte(SA_TX_Page0_Primary, 0x96) & 0x3F));
+    mdelay(T_SRC_WAKE_PULSE_WIDTH_2);	// adjust for code path
 
-	I2C_WriteByte(SA_TX_Page0_Primary, 0x96, (I2C_ReadByte(SA_TX_Page0_Primary, 0x96) | 0xC0));    mdelay(T_SRC_WAKE_PULSE_WIDTH_1);	// adjust for code path
+	I2C_WriteByte(SA_TX_Page0_Primary, 0x96, (I2C_ReadByte(SA_TX_Page0_Primary, 0x96) | 0xC0));
+    mdelay(T_SRC_WAKE_PULSE_WIDTH_1);	// adjust for code path
 
-	I2C_WriteByte(SA_TX_Page0_Primary, 0x96, (I2C_ReadByte(SA_TX_Page0_Primary, 0x96) & 0x3F));    mdelay(T_SRC_WAKE_PULSE_WIDTH_1);	// adjust for code path
+	I2C_WriteByte(SA_TX_Page0_Primary, 0x96, (I2C_ReadByte(SA_TX_Page0_Primary, 0x96) & 0x3F));
+    mdelay(T_SRC_WAKE_PULSE_WIDTH_1);	// adjust for code path
 
-	I2C_WriteByte(SA_TX_Page0_Primary, 0x96, (I2C_ReadByte(SA_TX_Page0_Primary, 0x96) | 0xC0));	mdelay(20);
+	I2C_WriteByte(SA_TX_Page0_Primary, 0x96, (I2C_ReadByte(SA_TX_Page0_Primary, 0x96) | 0xC0));
+	mdelay(20);
 
 	I2C_WriteByte(SA_TX_Page0_Primary, 0x96, (I2C_ReadByte(SA_TX_Page0_Primary, 0x96) & 0x3F));
 	mdelay(T_SRC_WAKE_TO_DISCOVER);
@@ -1138,7 +1239,8 @@ static	void	ApplyDdcAbortSafety()
 
 		MhlTxDrvProcessDisconnection();
 	}
-}///////////////////////////////////////////////////////////////////////////
+}
+///////////////////////////////////////////////////////////////////////////
 // ProcessRgnd
 //
 // H/W has detected impedance change and interrupted.
@@ -1172,7 +1274,8 @@ void	ProcessRgnd( void )
 	//
 	if (reg99RGNDRange == 0x00 || reg99RGNDRange == 0x03)
 	{
-			TX_DEBUG_PRINT((" : USB impedance. Disable MHL discovery.\n", (int)reg99RGNDRange));//3355
+			TX_DEBUG_PRINT((" : USB impedance. Disable MHL discovery.\n", (int)reg99RGNDRange));
+//3355
     if(vbus_mhl_est_fail == TRUE)
     {
       MhlTxDrvProcessDisconnection();
@@ -1190,27 +1293,51 @@ void	ProcessRgnd( void )
 
 	}
 	else
-	{		mhl_cable_status |= MHL_1K_IMPEDANCE_VERIFIED;
+	{
+		mhl_cable_status |= MHL_1K_IMPEDANCE_VERIFIED;
 		if(0x01==reg99RGNDRange)
 		{
-			TX_DEBUG_PRINT(("MHL 2K\n"));                        mhl_cable_status =MHL_TV_OFF_CABLE_CONNECT;
-			TX_DEBUG_PRINT2(KERN_ERR "MHL Connection Fail Power off ###1\n");
-#if defined(CONFIG_S5PC110_DEMPSEY_BOARD)                        FSA9480_MhlTvOff();//Rajucm: Mhl cable handling when TV Off 
-#endif      return ;
+			TX_DEBUG_PRINT(("MHL 2K\n"));
+                        mhl_cable_status =MHL_TV_OFF_CABLE_CONNECT;
+
+			TX_DEBUG_PRINT2(KERN_ERR "MHL Connection Fail Power off ###1\n");
+#if defined(CONFIG_S5PC110_DEMPSEY_BOARD)
+                        FSA9480_MhlTvOff();//Rajucm: Mhl cable handling when TV Off 
+#endif
+
+      return ;
 		}
 		else if(0x02==reg99RGNDRange)
 		{
 			printk(("MHL 1K\n"));
     
-	DelayMS(T_SRC_VBUS_CBUS_TO_STABLE);    
-    
-	// Discovery enabled    
-	I2C_WriteByte(SA_TX_Page0_Primary, 0x90, 0x25);    
-    
-	//    
-	// Send slow wake up pulse using GPIO or I2C    
-	//    
-	CbusWakeUpPulseGenerator();  EnableFSA9480Interrupts(); 
+	DelayMS(T_SRC_VBUS_CBUS_TO_STABLE);
+
+    
+
+
+    
+	// Discovery enabled
+
+    
+	I2C_WriteByte(SA_TX_Page0_Primary, 0x90, 0x25);
+
+    
+
+
+    
+	//
+
+    
+	// Send slow wake up pulse using GPIO or I2C
+
+    
+	//
+
+    
+	CbusWakeUpPulseGenerator();
+
+  EnableFSA9480Interrupts(); 
 		}
 	}
 	
@@ -1229,11 +1356,13 @@ void	SwitchToD0( void )
 	//
 	WriteInitialRegisterValues();
 
-	// Setup interrupt masks for all those we are interested.#if 0
+	// Setup interrupt masks for all those we are interested.
+#if 0
 	//UNMASK_INTR_4_INTERRUPTS;
 	UNMASK_INT4_INTERRUPTS;
 	//UNMASK_CBUS1_INTERRUPTS;
-	//UNMASK_CBUS2_INTERRUPTS;#else
+	//UNMASK_CBUS2_INTERRUPTS;
+#else
 	//MASK_INTR_4_INTERRUPTS;
 	MASK_INTR_1_INTERRUPTS;
 	//MASK_CBUS1_INTERRUPTS;
@@ -1243,7 +1372,8 @@ void	SwitchToD0( void )
 	// Force Power State to ON
 	I2C_WriteByte(SA_TX_Page0_Primary, 0x90, 0x25);
 
-	fwPowerState = TX_POWER_STATE_D0_NO_MHL;  	mhl_cable_status =MHL_POWER_ON;
+	fwPowerState = TX_POWER_STATE_D0_NO_MHL;
+  	mhl_cable_status =MHL_POWER_ON;
 }
 ////////////////////////////////////////////////////////////////////
 // SwitchToD3
@@ -1261,15 +1391,22 @@ void	SwitchToD3( void )
 	// 93[5:4] = 00  reg_cbusidle_pup_sel[1:0] = open (default)
 	//
 	// Disable CBUS pull-up during RGND measurement
-	//I2C_WriteByte(SA_TX_Page0_Primary, 0x93, 0x04);    ReadModifyWriteTPI(0x93, BIT_7 | BIT_6 | BIT_5 | BIT_4, 0);
+	//I2C_WriteByte(SA_TX_Page0_Primary, 0x93, 0x04);
+    ReadModifyWriteTPI(0x93, BIT_7 | BIT_6 | BIT_5 | BIT_4, 0);
     ReadModifyWriteTPI(0x93, BIT_7 | BIT_6 | BIT_5 | BIT_4, 0);//3355
-		ReadModifyWriteTPI(0x94, BIT_1 | BIT_0, 0);
+
+		ReadModifyWriteTPI(0x94, BIT_1 | BIT_0, 0);
 
 	// 1.8V CBUS VTH & GND threshold
 	//I2C_WriteByte(SA_TX_Page0_Primary, 0x94, 0x64);
-   ReleaseUsbIdSwitchOpen();
+
+   ReleaseUsbIdSwitchOpen();
   TX_DEBUG_PRINT2("TX_POWER_STATE_D3\n");
-	// Change TMDS termination to high impedance on disconnection	// Bits 1:0 set to 11	I2C_WriteByte(SA_TX_HDMI_RX_Primary, 0x01, 0x03);
+
+
+	// Change TMDS termination to high impedance on disconnection
+	// Bits 1:0 set to 11
+	I2C_WriteByte(SA_TX_HDMI_RX_Primary, 0x01, 0x03);
 	//
 	// Change state to D3 by clearing bit 0 of 3D (SW_TPI, Page 1) register
 	// ReadModifyWriteIndexedRegister(INDEXED_PAGE_1, 0x3D, BIT_0, 0x00);
@@ -1416,15 +1553,23 @@ static	void	Int4Isr( void )
 	}
 
 	if(reg74 & BIT_2) // MHL_EST_INT
-	{    	        MASK_CBUS1_INTERRUPTS; 
+	{
+    	        MASK_CBUS1_INTERRUPTS; 
     	        MASK_CBUS2_INTERRUPTS;
-		//fwPowerState = TX_POWER_STATE_D0_MHL;		//EnableFSA9480Interrupts(); //daniel 
+		//fwPowerState = TX_POWER_STATE_D0_MHL;
+		//EnableFSA9480Interrupts(); //daniel 
 		MhlTxDrvProcessConnection(); 
 	}
 
 	// process USB_EST interrupt
-	else if(reg74 & BIT_3) // MHL_DISC_FAIL_INT	{    if(mhl_cable_status == (MHL_1K_IMPEDANCE_VERIFIED|MHL_POWER_ON))//|MHL_RSEN_VERIFIED))    {      mhl_cable_status =MHL_TV_OFF_CABLE_CONNECT;		  TX_DEBUG_PRINT2(KERN_ERR "MHL Connection Fail Power off ###2\n");
-      #if defined(CONFIG_S5PC110_DEMPSEY_BOARD) //3355
+	else if(reg74 & BIT_3) // MHL_DISC_FAIL_INT
+	{
+    if(mhl_cable_status == (MHL_1K_IMPEDANCE_VERIFIED|MHL_POWER_ON))//|MHL_RSEN_VERIFIED))
+    {
+      mhl_cable_status =MHL_TV_OFF_CABLE_CONNECT;
+		  TX_DEBUG_PRINT2(KERN_ERR "MHL Connection Fail Power off ###2\n");
+      #if defined(CONFIG_S5PC110_DEMPSEY_BOARD)
+ //3355
         if(mhl_vbus == TRUE)
         {          
           vbus_mhl_est_fail = TRUE;
@@ -1433,9 +1578,16 @@ return;
         }
         else
         {
-        FSA9480_MhlTvOff();//Rajucm: Mhl cable handling when TV Off 	 	
+        FSA9480_MhlTvOff();//Rajucm: Mhl cable handling when TV Off 
+	 	
         }//3355
-      #endif    }    else    {      MhlTxDrvProcessDisconnection();    }    return;
+      #endif
+    }
+    else
+    {
+      MhlTxDrvProcessDisconnection();
+    }
+    return;
 	}
 
 	if((TX_POWER_STATE_D3 == fwPowerState) && (reg74 & BIT_6))
@@ -1833,7 +1985,8 @@ void SiiMhlTxInitialize( void )
 
 	MhlTxResetStates( );
 
-	SiiMhlTxChipInitialize ();	mhl_cable_status =MHL_POWER_ON;			//NAGSM_Android_SEL_Kernel_Aakash_20101214
+	SiiMhlTxChipInitialize ();
+	mhl_cable_status =MHL_POWER_ON;			//NAGSM_Android_SEL_Kernel_Aakash_20101214
 }
 
 
@@ -1928,17 +2081,32 @@ void SiiMhlTxGetEvents( byte *event, byte *eventParameter )
 				SiiMhlTxRapkSend( );
 				break;
 
-			case	MHL_MSC_MSG_RCP:				// If we get a RCP key that we do NOT support, send back RCPE				// Do not notify app layer.				if(MHL_LOGICAL_DEVICE_MAP & rcpSupportTable [mhlTxConfig.mscMsgData] )				{					*event          = MHL_TX_EVENT_RCP_RECEIVED;					*eventParameter = mhlTxConfig.mscMsgData; // key code          rcp_cbus_uevent(*eventParameter);	//MHL v1 //NAGSM_Android_SEL_Kernel_Aakash_20101126 //NAGSM_Android_SEL_Kernel_Aakash_20101206          TX_DEBUG_PRINT2("Key Code:%x \n",(int)mhlTxConfig.mscMsgData);
-				}				else				{  				TX_DEBUG_PRINT2("Key Code Error:%x \n",(int)mhlTxConfig.mscMsgData);
-					SiiMhlTxRcpeSend( 0x01 );				}
+			case	MHL_MSC_MSG_RCP:
+
+				// If we get a RCP key that we do NOT support, send back RCPE
+				// Do not notify app layer.
+				if(MHL_LOGICAL_DEVICE_MAP & rcpSupportTable [mhlTxConfig.mscMsgData] )
+				{
+					*event          = MHL_TX_EVENT_RCP_RECEIVED;
+					*eventParameter = mhlTxConfig.mscMsgData; // key code
+          rcp_cbus_uevent(*eventParameter);
+          TX_DEBUG_PRINT2("Key Code:%x \n",(int)mhlTxConfig.mscMsgData);
+				}
+				else
+				{
+  				TX_DEBUG_PRINT2("Key Code Error:%x \n",(int)mhlTxConfig.mscMsgData);
+					SiiMhlTxRcpeSend( 0x01 );
+				}
 				break;
 
 			case	MHL_MSC_MSG_RCPK:
-				*event = MHL_TX_EVENT_RCPK_RECEIVED;        *eventParameter = mhlTxConfig.mscMsgData; // key code
+				*event = MHL_TX_EVENT_RCPK_RECEIVED;
+        *eventParameter = mhlTxConfig.mscMsgData; // key code
 				break;
 
 			case	MHL_MSC_MSG_RCPE:
-				*event = MHL_TX_EVENT_RCPE_RECEIVED;        *eventParameter = mhlTxConfig.mscMsgData; // status code
+				*event = MHL_TX_EVENT_RCPE_RECEIVED;
+        *eventParameter = mhlTxConfig.mscMsgData; // status code
 				break;
 
 			case	MHL_MSC_MSG_RAPK:
@@ -2036,7 +2204,19 @@ void	SiiMhlTxMscCommandDone( byte data1 )
 		mhlTxConfig.mscLastOffset  = 0;
 
 		TX_DEBUG_PRINT( ("MhlTx: Peer's Feature Flag = %02X\n\n", (int) data1) );
-	}	else if(MHL_MSC_MSG_RCPE == mhlTxConfig.mscMsgLastCommand)	{		//		// RCPE is always followed by an RCPK with original key code that came.		//		if( SiiMhlTxRcpkSend( mhlTxConfig.mscSaveRcpKeyCode ) )		{			// Once the command has been sent out successfully, forget this case.			mhlTxConfig.mscMsgLastCommand = 0;			mhlTxConfig.mscMsgLastData    = 0;		}	}
+	}
+	else if(MHL_MSC_MSG_RCPE == mhlTxConfig.mscMsgLastCommand)
+	{
+		//
+		// RCPE is always followed by an RCPK with original key code that came.
+		//
+		if( SiiMhlTxRcpkSend( mhlTxConfig.mscSaveRcpKeyCode ) )
+		{
+			// Once the command has been sent out successfully, forget this case.
+			mhlTxConfig.mscMsgLastCommand = 0;
+			mhlTxConfig.mscMsgLastData    = 0;
+		}
+	}
 }
 ///////////////////////////////////////////////////////////////////////////////
 //
@@ -2106,7 +2286,8 @@ void	SiiMhlTxGotMhlStatus( byte status_0, byte status_1 )
 	if(MHL_STATUS_DCAP_RDY & status_0)
 	{
 //		MhlTxDriveStates( );
-//		SiiMhlTxReadDevcap( MHL_DEV_CATEGORY_OFFSET );    mhlTxConfig.mscState	 = MSC_STATE_BEGIN;
+//		SiiMhlTxReadDevcap( MHL_DEV_CATEGORY_OFFSET );
+    mhlTxConfig.mscState	 = MSC_STATE_BEGIN;
 	}
 	// status_1 has the PATH_EN etc. Not yet implemented
 	// Remeber the event.
@@ -2161,7 +2342,21 @@ static	bool SiiMhlTxRapkSend( void )
 {
 	return	( MhlTxSendMscMsg ( MHL_MSC_MSG_RAPK, 0 ) );
 }
-  /////////////////////////////////////////////////////////////////////////////////// SiiMhlTxRcpeSend//// The function will return a value of true if it could successfully send the RCPE// subcommand. Otherwise false.//// When successful, MhlTx internally sends RCPK with original (last known)// keycode.//bool SiiMhlTxRcpeSend( byte rcpeErrorCode ){	return( MhlTxSendMscMsg ( MHL_MSC_MSG_RCPE, rcpeErrorCode ) );}
+
+  ///////////////////////////////////////////////////////////////////////////////
+//
+// SiiMhlTxRcpeSend
+//
+// The function will return a value of true if it could successfully send the RCPE
+// subcommand. Otherwise false.
+//
+// When successful, MhlTx internally sends RCPK with original (last known)
+// keycode.
+//
+bool SiiMhlTxRcpeSend( byte rcpeErrorCode )
+{
+	return( MhlTxSendMscMsg ( MHL_MSC_MSG_RCPE, rcpeErrorCode ) );
+}
 ///////////////////////////////////////////////////////////////////////////////
 //
 // SiiMhlTxReadDevcap
@@ -2203,7 +2398,10 @@ static bool MhlTxSendMscMsg ( byte command, byte cmdData )
 	//
 	// Send MSC_MSG command
 	//
-	req.command     = MHL_MSC_MSG;	req.msgData[0]  = mhlTxConfig.mscMsgLastCommand = command;	req.msgData[1]  = mhlTxConfig.mscMsgLastData    = cmdData;
+	req.command     = MHL_MSC_MSG;
+
+	req.msgData[0]  = mhlTxConfig.mscMsgLastCommand = command;
+	req.msgData[1]  = mhlTxConfig.mscMsgLastData    = cmdData;
 
 	ccode = SiiMhlTxDrvSendCbusCommand( &req  );
 	return( (bool) ccode );
@@ -2217,7 +2415,9 @@ static bool MhlTxSendMscMsg ( byte command, byte cmdData )
 void	SiiMhlTxNotifyConnection( bool mhlConnected )
 {
 //	TX_DEBUG_PRINT2("SiiMhlTxNotifyConnection %01X\n", (int) mhlConnected );
-	mhlTxConfig.mhlConnectionEvent = TRUE;  mhlTxConfig.mscState	 = MSC_STATE_IDLE;
+	mhlTxConfig.mhlConnectionEvent = TRUE;
+
+  mhlTxConfig.mscState	 = MSC_STATE_IDLE;
 	if(mhlConnected)
 	{
 		mhlTxConfig.mhlConnected = MHL_TX_EVENT_CONNECTION;
@@ -2542,7 +2742,8 @@ void	AppRcpDemo( byte event, byte eventParameter)
 
         break;
       }
-      rcpKeyCode = eventParameter;
+      
+rcpKeyCode = eventParameter;
 			SiiMhlTxRcpkSend(rcpKeyCode);
 			break;
 
@@ -2632,7 +2833,8 @@ void SiI9234_interrupt_event(void)
     		I2C_WriteByte(SA_TX_Page0_Primary, (0x74), tmp);   // clear all interrupts
     		tmp = I2C_ReadByte(SA_TX_Page0_Primary, 0x71);
     		I2C_WriteByte(SA_TX_Page0_Primary, 0x71, tmp);
-    		tmp = ReadByteCBUS(0x08);
+
+    		tmp = ReadByteCBUS(0x08);
     		WriteByteCBUS(0x08, tmp);  
 
     		tmp = ReadByteCBUS(0x1E);
@@ -2645,11 +2847,14 @@ void SiI9234_interrupt_event(void)
         mhl_cable_status) //NAGSM_Android_SEL_Kernel_Aakash_20101214
       {
           byte tmp;
-          tmp = I2C_ReadByte(SA_TX_Page0_Primary, (0x74));   // read status	        flag |= (tmp&INTR_4_DESIRED_MASK);	  
+          tmp = I2C_ReadByte(SA_TX_Page0_Primary, (0x74));   // read status
+	        flag |= (tmp&INTR_4_DESIRED_MASK);	  
           TX_DEBUG_PRINT2("#1 (0x74) flag: %x\n",(int) flag );
 
           //I2C_WriteByte(SA_TX_Page0_Primary, (0x74), tmp);   // clear all interrupts
-          tmp = I2C_ReadByte(SA_TX_Page0_Primary, 0x71);          //I2C_WriteByte(SA_TX_Page0_Primary, 0x71, tmp);          flag |= (tmp&INTR_1_DESIRED_MASK);
+          tmp = I2C_ReadByte(SA_TX_Page0_Primary, 0x71);
+          //I2C_WriteByte(SA_TX_Page0_Primary, 0x71, tmp);
+          flag |= (tmp&INTR_1_DESIRED_MASK);
           TX_DEBUG_PRINT2("#1 (0x71) flag: %x\n",(int) flag );
 
           if(mhlTxConfig.mhlConnected == MHL_TX_EVENT_DISCONNECTION)//(mhlTxConfig_status()== MHL_TX_EVENT_DISCONNECTION)//
@@ -2657,17 +2862,20 @@ void SiI9234_interrupt_event(void)
             tmp = ReadByteCBUS(0x08);
             TX_DEBUG_PRINT2("#2 (ReadByteCBUS(0x08)) Temp: %x\n",(int) tmp );
             WriteByteCBUS(0x08, tmp);  
-            tmp = ReadByteCBUS(0x1E);
+
+            tmp = ReadByteCBUS(0x1E);
             TX_DEBUG_PRINT2("#2 (ReadByteCBUS(0x1E)) Temp: %x\n",(int) tmp );
             WriteByteCBUS(0x1E, tmp);    
 
           }
           else
           {
-          tmp = ReadByteCBUS(0x08);            flag |= (tmp&INTR_CBUS1_DESIRED_MASK);
+          tmp = ReadByteCBUS(0x08);
+            flag |= (tmp&INTR_CBUS1_DESIRED_MASK);
             TX_DEBUG_PRINT2("#1 (ReadByteCBUS(0x08)) Temp: %x\n",(int) flag );
 
-          tmp = ReadByteCBUS(0x1E);            flag |= (tmp&INTR_CBUS2_DESIRED_MASK);
+          tmp = ReadByteCBUS(0x1E);
+            flag |= (tmp&INTR_CBUS2_DESIRED_MASK);
             TX_DEBUG_PRINT2("#1 (ReadByteCBUS(0x1E)) Temp: %x\n",(int) flag );              
           }
 
