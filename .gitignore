@@ -11,6 +11,14 @@
 #
 .*
 *.o
+# !drivers/mfd/cg2900/built-in.o
+# !drivers/mfd/cg2900/cg2900.o
+# !drivers/mfd/cg2900/cg2900_audio.o
+# !drivers/mfd/cg2900/cg2900_char_devices.o
+# !drivers/mfd/cg2900/cg2900_chip.o
+# !drivers/mfd/cg2900/cg2900_core.o
+# !drivers/mfd/cg2900/cg2900_uart.o
+# !drivers/mfd/cg2900/stlc2690_chip.o
 *.o.*
 *.a
 *.s
@@ -22,6 +30,7 @@
 *.lst
 *.symtypes
 *.order
+!drivers/mfd/cg2900/modules.order
 *.elf
 *.bin
 *.gz
@@ -46,8 +55,7 @@ Module.symvers
 # Generated include files
 #
 include/asm
-include/asm-*
-!include/asm-generic
+include/asm-arm
 include/config
 include/linux/autoconf.h
 include/linux/compile.h
