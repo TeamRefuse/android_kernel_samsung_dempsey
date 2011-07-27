@@ -7989,7 +7989,7 @@ MACHINE_START(SMDKC110, "SMDKC110")
 #endif
 MACHINE_END
 
-MACHINE_START(ARIES, "herring")
+MACHINE_START(ARIES, "aries")
 	.phys_io	= S3C_PA_UART & 0xfff00000,
 	.io_pg_offst	= (((u32)S3C_VA_UART) >> 18) & 0xfffc,
 	.boot_params	= S5P_PA_SDRAM + 0x100,

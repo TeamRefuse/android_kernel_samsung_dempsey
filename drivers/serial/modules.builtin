@@ -1,3 +1,0 @@
-kernel/drivers/serial/serial_core.ko
-kernel/drivers/serial/samsung.ko
-kernel/drivers/serial/s5pv210.ko

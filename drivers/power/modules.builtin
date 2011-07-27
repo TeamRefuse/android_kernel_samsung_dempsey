@@ -1,3 +1,0 @@
-kernel/drivers/power/power_supply.ko
-kernel/drivers/power/max17040_battery.ko
-kernel/drivers/power/s5pc110_battery.ko
