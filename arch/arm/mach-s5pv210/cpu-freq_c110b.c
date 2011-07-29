@@ -879,7 +879,11 @@ static int __init s5pv210_cpufreq_driver_init(struct cpufreq_policy *policy)
 		g_dvfslockval[i] = MAX_PERF_LEVEL;
 #endif
 
-	return cpufreq_frequency_table_cpuinfo(policy, freq_table);
+	cpufreq_frequency_table_cpuinfo(policy, freq_table);
+	/* define safe default min and max speeds */
+	policy->max = 1200000;
+	policy->min = 100000;
+	return 0;
 }
 
 static int s5pv210_cpufreq_notifier_event(struct notifier_block *this,
