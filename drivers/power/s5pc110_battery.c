@@ -2044,6 +2044,12 @@ static ssize_t s3c_bat_show_attrs(struct device *dev,
 		break;	
 #endif			
 
+#if (defined ATT_TMO_COMMON)
+	case BATT_CHG_CURRENT:
+	  chg->bat_info.batt_current = s3c_bat_get_adc_data(S3C_ADC_CHG_CURRENT);
+	  i += scnprintf(buf + i, PAGE_SIZE - i, "%d\n", chg->bat_info.batt_current);
+	  break;
+#endif
 		
 	case BATT_CHARGING_SOURCE:
 		i += scnprintf(buf + i, PAGE_SIZE - i, "%d\n", chg->cable_status);
