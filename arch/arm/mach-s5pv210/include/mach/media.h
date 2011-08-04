@@ -17,7 +17,7 @@
 #define S5P_MDEV_FIMC0      0
 #define S5P_MDEV_FIMC1      1
 #define S5P_MDEV_FIMC2      2
-#define S5P_MDEV_TV         3
+#define S5P_MDEV_G2D        3
 #define S5P_MDEV_MFC        4
 #define S5P_MDEV_JPEG       5
 #define S5P_MDEV_PMEM       6
