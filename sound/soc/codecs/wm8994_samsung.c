@@ -313,21 +313,23 @@ static int wm899x_inpga_put_volsw_vu(struct snd_kcontrol *kcontrol,
  * Implementation of sound path
  */
 #if defined(CONFIG_S5PC110_DEMPSEY_BOARD)
-#define MAX_PLAYBACK_PATHS 13
+#define MAX_PLAYBACK_PATHS 17
 #else
-#define MAX_PLAYBACK_PATHS 8
+#define MAX_PLAYBACK_PATHS 12
 #endif
 #define MAX_VOICECALL_PATH 5
 
 #if defined(CONFIG_S5PC110_DEMPSEY_BOARD)
 static const char *playback_path[] = {
 	"OFF", "RCV", "SPK", "HP", "HP_NO_MIC", "BT", "SPK_HP",
-	"EXTRA_DOCK_SPEAKER", "TV_OUT","HDMI_TV_OUT", "HDMI_SPK", "HDMI_DUAL"
+	"EXTRA_DOCK_SPEAKER", "TV_OUT","HDMI_TV_OUT", "HDMI_SPK", "HDMI_DUAL",
+    "RING_SPK", "RING_HP", "RING_NO_MIC", "RING_SPK_HP"
 };
 #else
 static const char *playback_path[] = {
 	"OFF", "RCV", "SPK", "HP", "HP_NO_MIC", "BT", "SPK_HP",
-	"EXTRA_DOCK_SPEAKER"
+	"EXTRA_DOCK_SPEAKER",
+    "RING_SPK", "RING_HP", "RING_NO_MIC", "RING_SPK_HP"
 };
 #endif
 static const char *voicecall_path[] = {
@@ -492,6 +494,19 @@ static int wm8994_set_path(struct snd_kcontrol *kcontrol,
 	case SPK_HP:
 	case EXTRA_DOCK_SPEAKER:
 		DEBUG_LOG("routing to %s\n", mc->texts[path_num]);
+        wm8994->Ring_state = RING_OFF;
+		break;
+   	case RING_SPK:
+	case RING_HP:
+	case RING_NO_MIC:
+		DEBUG_LOG("routing to %s\n", mc->texts[path_num]);
+		wm8994->Ring_state = RING_ON;
+		path_num -= 10;
+		break;
+	case RING_SPK_HP:
+		DEBUG_LOG("routing to %s\n", mc->texts[path_num]);
+		wm8994->Ring_state = RING_ON;
+		path_num -= 9;
 		break;
 	#if defined(CONFIG_S5PC110_DEMPSEY_BOARD)		
 		case HDMI_TV_OUT:

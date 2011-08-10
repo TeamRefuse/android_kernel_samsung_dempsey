@@ -2376,7 +2376,7 @@ void wm8994_set_playback_headset(struct snd_soc_codec *codec)
 	wm8994_write(codec, WM8994_POWER_MANAGEMENT_3, val);
 
 	/* set gain */
-	if (wm8994->output_source == RING_TONE)
+	if (wm8994->Ring_state == RING_TONE)
 		wm8994_set_codec_gain(codec, PLAYBACK_MODE, PLAYBACK_RING_HP);
 	else if (wm8994->output_source == VOIP_OUTPUT)
 		wm8994_set_codec_gain(codec, PLAYBACK_MODE, PLAYBACK_VOIP_HP);
@@ -2480,7 +2480,7 @@ void wm8994_set_playback_speaker(struct snd_soc_codec *codec)
 	val |= (WM8994_AIF1DAC1L_ENA | WM8994_DAC1L_ENA | WM8994_AIF1DAC1R_ENA | WM8994_DAC1R_ENA); // hdlnc_ldj_0416_A1026	
 	wm8994_write(codec, WM8994_POWER_MANAGEMENT_5, val);
 
-	if (wm8994->output_source == RING_TONE)
+	if (wm8994->Ring_state == RING_TONE)
 		wm8994_set_codec_gain(codec, PLAYBACK_MODE, PLAYBACK_RING_SPK);
 	else if (wm8994->output_source == VOIP_OUTPUT)
 		wm8994_set_codec_gain(codec, PLAYBACK_MODE, PLAYBACK_VOIP_SPK);
@@ -2597,7 +2597,7 @@ void wm8994_set_playback_speaker_headset(struct snd_soc_codec *codec)
 	wm8994_write(codec, WM8994_POWER_MANAGEMENT_3, val);
 
 	/* set gain */
-	if (wm8994->output_source == RING_TONE)
+	if (wm8994->Ring_state == RING_TONE)
 		wm8994_set_codec_gain(codec, PLAYBACK_MODE,
 				PLAYBACK_RING_SPK_HP);
 	else
