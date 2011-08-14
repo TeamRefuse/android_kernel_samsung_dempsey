@@ -44,6 +44,7 @@ obj-$(CONFIG_PN544)		+= pn544.o
 obj-$(CONFIG_SAMSUNG_JACK)	+= sec_jack.o
 obj-$(CONFIG_USB_SWITCH_FSA9480)	+= fsa9480.o
 obj-$(CONFIG_SAMSUNG_MODEMCTL)	+= samsung_modemctl/
+obj-$(CONFIG_GENERIC_BLN) += bln.o
 obj-$(CONFIG_SAMSUNG_FM_SI4709)		+= fm_si4709/
 obj-$(CONFIG_VIBETONZ)		+= vibetonz/
 obj-$(CONFIG_LEVEL)			+= level/

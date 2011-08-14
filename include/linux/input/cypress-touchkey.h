@@ -25,6 +25,7 @@ struct touchkey_platform_data {
 	int keycode_cnt;
 	const int *keycode;
 	void (*touchkey_onoff) (int);
+    void (*touchkey_sleep_onoff) (int);
 };
 
 enum {
