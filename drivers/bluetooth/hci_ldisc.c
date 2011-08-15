@@ -527,15 +527,12 @@ static int __init hci_uart_init(void)
 	hci_uart_ldisc.receive_buf	= hci_uart_tty_receive;
 	hci_uart_ldisc.write_wakeup	= hci_uart_tty_wakeup;
 	hci_uart_ldisc.owner		= THIS_MODULE;
-//++Adding scott
-#if 0
+
 	if ((err = tty_register_ldisc(N_HCI, &hci_uart_ldisc))) {
 		BT_ERR("HCI line discipline registration failed. (%d)", err);
 		return err;
 	}
-#endif
 
-//--Adding scott
 #ifdef CONFIG_BT_HCIUART_H4
 	h4_init();
 #endif
