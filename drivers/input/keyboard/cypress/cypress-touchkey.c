@@ -271,16 +271,41 @@ static void cypress_touchkey_early_suspend(struct early_suspend *h)
  * Disallow powering off the touchkey controller
  * while a led notification is ongoing
  */
-    if(!bln_is_ongoing())
+    if(!bln_is_ongoing)
 #endif
 	devdata->pdata->touchkey_onoff(TOUCHKEY_OFF);
 
 	all_keys_up(devdata);
-       #if defined(CONFIG_S5PC110_DEMPSEY_BOARD)
+
+    #if defined(CONFIG_S5PC110_DEMPSEY_BOARD)
 	touchkey_ldo_on(0);
-       #endif
+    #endif
 
 }
+
+static void cypress_touchkey_early_resume(struct early_suspend *h)
+{
+	struct cypress_touchkey_devdata *devdata =
+		container_of(h, struct cypress_touchkey_devdata, early_suspend);
+	#if defined(CONFIG_S5PC110_DEMPSEY_BOARD)
+		touchkey_ldo_on(1);
+    #endif
+
+	devdata->pdata->touchkey_onoff(TOUCHKEY_ON);
+#if 0
+	if (i2c_touchkey_write_byte(devdata, devdata->backlight_on)) {
+		devdata->is_dead = true;
+		devdata->pdata->touchkey_onoff(TOUCHKEY_OFF);
+		dev_err(&devdata->client->dev, "%s: touch keypad not responding"
+				" to commands, disabling\n", __func__);
+		return;
+	}
+#endif
+	devdata->is_dead = false;
+	enable_irq(devdata->client->irq);
+	devdata->is_powering_on = false;
+}
+#endif
 
 static void enable_touchkey_backlights(void){
        i2c_touchkey_write_byte(blndevdata, blndevdata->backlight_on);
@@ -295,7 +320,10 @@ static void cypress_touchkey_enable_led_notification(void){
 	if (blndevdata->is_powering_on){
 		/* reconfigure gpio for sleep mode */
 		blndevdata->pdata->touchkey_sleep_onoff(TOUCHKEY_ON);
-
+        #if defined(CONFIG_S5PC110_DEMPSEY_BOARD)
+	    touchkey_ldo_on(1);
+        #endif
+        msleep(100);
 		/*
 		 * power on the touchkey controller
 		 * This is actually not needed, but it is intentionally
@@ -321,7 +349,9 @@ static void cypress_touchkey_disable_led_notification(void){
 	/* if touchkeys lights are not used for touchmode */
 	if (blndevdata->is_powering_on){
 		disable_touchkey_backlights();
-
+        #if defined(CONFIG_S5PC110_DEMPSEY_BOARD)
+	    touchkey_ldo_on(1);
+        #endif
 		#if 0
 		/*
 		 * power off the touchkey controller
@@ -338,30 +368,6 @@ static struct bln_implementation cypress_touchkey_bln = {
 	.disable = cypress_touchkey_disable_led_notification,
 };
 
-
-static void cypress_touchkey_early_resume(struct early_suspend *h)
-{
-	struct cypress_touchkey_devdata *devdata =
-		container_of(h, struct cypress_touchkey_devdata, early_suspend);
-	#if defined(CONFIG_S5PC110_DEMPSEY_BOARD)
-		touchkey_ldo_on(1);
-        #endif
-
-	devdata->pdata->touchkey_onoff(TOUCHKEY_ON);
-#if 0
-	if (i2c_touchkey_write_byte(devdata, devdata->backlight_on)) {
-		devdata->is_dead = true;
-		devdata->pdata->touchkey_onoff(TOUCHKEY_OFF);
-		dev_err(&devdata->client->dev, "%s: touch keypad not responding"
-				" to commands, disabling\n", __func__);
-		return;
-	}
-#endif
-	devdata->is_dead = false;
-	enable_irq(devdata->client->irq);
-	devdata->is_powering_on = false;
-}
-#endif
 
 #if defined(TOUCH_UPDATE)
 extern int get_touchkey_firmware(char *version);
@@ -728,6 +734,13 @@ static int cypress_touchkey_probe(struct i2c_client *client,
 	register_early_suspend(&devdata->early_suspend);
 
 	devdata->is_powering_on = false;
+
+#ifdef CONFIG_GENERIC_BLN
+    blndevdata = devdata;
+    register_bln_implementation(&cypress_touchkey_bln);
+#endif
+
+
 #if defined(TOUCH_UPDATE)
 	ret = misc_register(&touchkey_update_device);
 	if (ret) {
@@ -804,11 +817,6 @@ static int cypress_touchkey_probe(struct i2c_client *client,
 	   	}
 #endif
 
-#endif
-
-#ifdef CONFIG_GENERIC_BLN
-    blndevdata = devdata;
-    register_bln_implementation(&cypress_touchkey_bln);
 #endif
 
 	return 0;
