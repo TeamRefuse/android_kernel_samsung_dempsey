@@ -271,7 +271,7 @@ static void cypress_touchkey_early_suspend(struct early_suspend *h)
  * Disallow powering off the touchkey controller
  * while a led notification is ongoing
  */
-    if(!bln_is_ongoing)
+    if(!bln_is_ongoing())
 #endif
 	devdata->pdata->touchkey_onoff(TOUCHKEY_OFF);
 
@@ -323,7 +323,7 @@ static void cypress_touchkey_enable_led_notification(void){
         #if defined(CONFIG_S5PC110_DEMPSEY_BOARD)
 	    touchkey_ldo_on(1);
         #endif
-        msleep(100);
+        msleep(50);
 		/*
 		 * power on the touchkey controller
 		 * This is actually not needed, but it is intentionally
