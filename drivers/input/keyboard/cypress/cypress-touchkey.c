@@ -349,9 +349,7 @@ static void cypress_touchkey_disable_led_notification(void){
 	/* if touchkeys lights are not used for touchmode */
 	if (blndevdata->is_powering_on){
 		disable_touchkey_backlights();
-        #if defined(CONFIG_S5PC110_DEMPSEY_BOARD)
-	    touchkey_ldo_on(1);
-        #endif
+
 		#if 0
 		/*
 		 * power off the touchkey controller
