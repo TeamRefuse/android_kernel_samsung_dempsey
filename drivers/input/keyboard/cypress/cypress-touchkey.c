@@ -323,7 +323,7 @@ static void cypress_touchkey_enable_led_notification(void){
         #if defined(CONFIG_S5PC110_DEMPSEY_BOARD)
 	    touchkey_ldo_on(1);
         #endif
-        msleep(50);
+        msleep(100);
 		/*
 		 * power on the touchkey controller
 		 * This is actually not needed, but it is intentionally
