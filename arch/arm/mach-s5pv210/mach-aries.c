@@ -2404,24 +2404,6 @@ static void touch_keypad_onoff(int onoff)
 		msleep(25);
 }
 
-static void touch_keypad_gpio_sleep(int onoff)
-{
-#if !defined (CONFIG_S5PC110_DEMPSEY_BOARD)
-	if (onoff == TOUCHKEY_ON) {
-		/*
-		 * reconfigure gpio to activate touchkey controller vdd in sleep mode
-		 */
-		s3c_gpio_slp_cfgpin(_3_GPIO_TOUCH_EN, S3C_GPIO_SLP_OUT1);
-	} else {
-		/*
-		 * reconfigure gpio to deactivate touchkey vdd in sleep mode,
-		 * this is the default
-		 */
-		s3c_gpio_slp_cfgpin(_3_GPIO_TOUCH_EN, S3C_GPIO_SLP_OUT0);
-	}
-#endif
-}
-
 #if defined (CONFIG_S5PC110_KEPLER_BOARD)
 static const int touch_keypad_code[] = {
 	KEY_MENU,
