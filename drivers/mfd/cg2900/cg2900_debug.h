@@ -20,9 +20,9 @@
 #include <linux/kernel.h>
 #include <linux/types.h>
 
-//#define CG2900_DEFAULT_DEBUG_LEVEL 40
+#define CG2900_DEFAULT_DEBUG_LEVEL 40
 //CG2900_GB
-#define CG2900_DEFAULT_DEBUG_LEVEL 0
+//#define CG2900_DEFAULT_DEBUG_LEVEL 0
 //CG2900_GB
 
 /* module_param declared in cg2900_core.c */

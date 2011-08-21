@@ -105,7 +105,7 @@
 
 /* HCI TTY line discipline value */
 #ifndef N_HCI
-#define N_HCI			15
+#define N_HCI               15
 #endif
 
 /* IOCTLs for UART */

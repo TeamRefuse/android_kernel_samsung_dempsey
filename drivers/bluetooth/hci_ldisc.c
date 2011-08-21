@@ -527,15 +527,11 @@ static int __init hci_uart_init(void)
 	hci_uart_ldisc.receive_buf	= hci_uart_tty_receive;
 	hci_uart_ldisc.write_wakeup	= hci_uart_tty_wakeup;
 	hci_uart_ldisc.owner		= THIS_MODULE;
-//++Adding scott
-#if 0
-	if ((err = tty_register_ldisc(N_HCI, &hci_uart_ldisc))) {
+	if ((err = tty_register_ldisc(N_BT_HCI, &hci_uart_ldisc))) {
 		BT_ERR("HCI line discipline registration failed. (%d)", err);
 		return err;
 	}
-#endif
 
-//--Adding scott
 #ifdef CONFIG_BT_HCIUART_H4
 	h4_init();
 #endif
@@ -564,7 +560,7 @@ static void __exit hci_uart_exit(void)
 #endif
 
 	/* Release tty registration of line discipline */
-	if ((err = tty_unregister_ldisc(N_HCI)))
+	if ((err = tty_unregister_ldisc(N_BT_HCI)))
 		BT_ERR("Can't unregister HCI line discipline (%d)", err);
 }
 
@@ -578,4 +574,4 @@ MODULE_AUTHOR("Marcel Holtmann <marcel@holtmann.org>");
 MODULE_DESCRIPTION("Bluetooth HCI UART driver ver " VERSION);
 MODULE_VERSION(VERSION);
 MODULE_LICENSE("GPL");
-MODULE_ALIAS_LDISC(N_HCI);
+MODULE_ALIAS_LDISC(N_BT_HCI);

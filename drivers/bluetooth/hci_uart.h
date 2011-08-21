@@ -23,8 +23,8 @@
  *
  */
 
-#ifndef N_HCI
-#define N_HCI	15
+#ifndef N_BT_HCI
+#define N_BT_HCI	22
 #endif
 
 /* Ioctls */
