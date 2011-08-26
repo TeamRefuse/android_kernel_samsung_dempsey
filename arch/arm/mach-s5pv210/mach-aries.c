@@ -5913,20 +5913,11 @@ static struct i2c_board_info i2c_devs8[] __initdata = {
 static int fsa9480_init_flag = 0;
 static bool mtp_off_status;
 extern int max8998_check_vdcin();
-#ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
-extern u16 askonstatus;
-void fsa9480_usb_cb(bool attached)
-#else
 static void fsa9480_usb_cb(bool attached)
-#endif
 {
 	struct usb_gadget *gadget = platform_get_drvdata(&s3c_device_usbgadget);
 
-#ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
-	if ((gadget) && (askonstatus != 0xabcd)) {
-#else
 	if (gadget) {
-#endif
 		if (attached)
 			usb_gadget_vbus_connect(gadget);
 		else
@@ -7880,10 +7871,6 @@ static void __init aries_machine_init(void)
 	s3c_gpio_cfgpin( GPIO_VT_CAM_SDA_18V, 1 );
 	s3c_gpio_setpull(GPIO_VT_CAM_SDA_18V, S3C_GPIO_PULL_UP); 	
 #endif
-	#ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
-/* soonyong.cho : This is for setting unique serial number */
-	s3c_usb_set_serial();
-	#endif
 #if !defined (CONFIG_S5PC110_DEMPSEY_BOARD)	
 	if (gpio_is_valid(GPIO_MSENSE_nRST)) {
 		if (gpio_request(GPIO_MSENSE_nRST, "GPB"))
