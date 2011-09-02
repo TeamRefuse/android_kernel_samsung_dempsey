@@ -538,6 +538,15 @@ static int wm8994_set_path(struct snd_kcontrol *kcontrol,
 //]mook_GB : add in audience
 
 	wm8994->codec_state |= PLAYBACK_ACTIVE;
+
+   	if (wm8994->codec_state & CALL_ACTIVE) {
+		wm8994->codec_state &= ~(CALL_ACTIVE);
+
+		val = wm8994_read(codec, WM8994_CLOCKING_1);
+		val &= ~(WM8994_DSP_FS2CLK_ENA_MASK | WM8994_SYSCLK_SRC_MASK);
+		wm8994_write(codec, WM8994_CLOCKING_1, val);
+	}
+
 	wm8994->cur_path = path_num;
 	wm8994->universal_playback_path[wm8994->cur_path] (codec);
 
