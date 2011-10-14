@@ -494,7 +494,7 @@ static int wm8994_set_path(struct snd_kcontrol *kcontrol,
 	}
 
     if (path_num == 4 && _dockredir)
-        path_num = 11;
+        path_num = 7;
 
 	switch (path_num) {
 	case OFF:
